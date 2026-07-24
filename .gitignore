@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables and secrets
+.env
+.env.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Private documents
+data/raw/private/*
+!data/raw/private/.gitkeep
+
+# Generated data
+data/interim/*
+data/processed/*
+data/indexes/*
+
+# Models and large files
+models/adapters/*
+models/registry/*
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Build
+build/
+dist/
+
+# Windows
+Thumbs.db
+desktop.ini
