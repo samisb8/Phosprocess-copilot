@@ -1,0 +1,728 @@
+"""Recherche hybride dense + BM25 avec Reciprocal Rank Fusion."""
+
+from __future__ import annotations
+
+import re
+import time
+import unicodedata
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+from phosprocess.preprocessing.chunk_schemas import DocumentChunk
+from phosprocess.retrieval.bm25 import BM25Retriever
+from phosprocess.retrieval.dense import DenseRetriever
+
+_QUERY_EXPANSIONS: tuple[
+    tuple[str, tuple[str, ...]],
+    ...,
+] = (
+    (
+        "rapport de recirculation externe",
+        ("external recirculation ratio",),
+    ),
+    (
+        "rapport de recirculation interne",
+        ("internal recirculation ratio",),
+    ),
+    (
+        "recirculation externe",
+        ("external recirculation",),
+    ),
+    (
+        "recirculation interne",
+        ("internal recirculation",),
+    ),
+    (
+        "reacteur jacobs",
+        ("jacobs reactor",),
+    ),
+    (
+        "procede jacobs",
+        ("jacobs process",),
+    ),
+    (
+        "filtrabilite",
+        ("filterability", "filtration"),
+    ),
+    (
+        "cristaux de gypse",
+        ("gypsum crystals",),
+    ),
+    (
+        "gypse",
+        ("gypsum",),
+    ),
+    (
+        "acide phosphorique",
+        ("phosphoric acid",),
+    ),
+    (
+        "acide sulfurique",
+        ("sulfuric acid",),
+    ),
+    (
+        "phosphate naturel",
+        ("phosphate rock",),
+    ),
+    (
+        "roche phosphatee",
+        ("phosphate rock",),
+    ),
+    (
+        "taux de sulfate",
+        ("sulfate concentration",),
+    ),
+(
+    "forte supersaturation",
+    ("high supersaturation", "hypersaturation"),
+),
+(
+    "supersaturation",
+    ("supersaturation", "hypersaturation"),
+),
+(
+    "petits cristaux",
+    ("small crystals",),
+),
+(
+    "difficiles a filtrer",
+    ("poor filtration", "poor filterability"),
+),
+(
+    "filtrer",
+    ("filtration", "filterability"),
+),
+)
+
+@dataclass(frozen=True, slots=True)
+class HybridConfig:
+    """Configuration du moteur hybride."""
+
+    fusion_method: str = "rrf"
+
+    dense_candidate_k: int = 30
+    bm25_candidate_k: int = 30
+    default_top_k: int = 5
+
+    rrf_k: int = 60
+    dense_weight: float = 1.0
+    bm25_weight: float = 1.0
+
+    lexical_query_expansion: bool = True
+    query_expansion_version: str = "phosphoric_v1"
+
+    pipeline_version: str = "0.1.0"
+
+    def __post_init__(self) -> None:
+        """Valider les paramètres."""
+
+        if self.fusion_method != "rrf":
+            raise ValueError(
+                "Seule la méthode de fusion 'rrf' est prise en charge."
+            )
+
+        if self.dense_candidate_k <= 0:
+            raise ValueError(
+                "dense_candidate_k doit être strictement positif."
+            )
+
+        if self.bm25_candidate_k <= 0:
+            raise ValueError(
+                "bm25_candidate_k doit être strictement positif."
+            )
+
+        if self.default_top_k <= 0:
+            raise ValueError(
+                "default_top_k doit être strictement positif."
+            )
+
+        if self.rrf_k < 0:
+            raise ValueError(
+                "rrf_k doit être positif ou nul."
+            )
+
+        if self.dense_weight <= 0:
+            raise ValueError(
+                "dense_weight doit être strictement positif."
+            )
+
+        if self.bm25_weight <= 0:
+            raise ValueError(
+                "bm25_weight doit être strictement positif."
+            )
+
+        if (
+            self.query_expansion_version
+            != "phosphoric_v1"
+        ):
+            raise ValueError(
+                "Version d'expansion lexicale inconnue : "
+                f"{self.query_expansion_version}"
+            )
+
+
+@dataclass(slots=True)
+class _FusionCandidate:
+    """Candidat interne avant classement final."""
+
+    chunk: DocumentChunk
+
+    dense_rank: int | None = None
+    dense_score: float | None = None
+
+    bm25_rank: int | None = None
+    bm25_score: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HybridSearchResult:
+    """Résultat individuel après fusion RRF."""
+
+    rank: int
+    rrf_score: float
+
+    matched_retrievers: tuple[str, ...]
+
+    dense_rank: int | None
+    dense_score: float | None
+    dense_rrf_contribution: float
+
+    bm25_rank: int | None
+    bm25_score: float | None
+    bm25_rrf_contribution: float
+
+    chunk: DocumentChunk
+
+
+@dataclass(frozen=True, slots=True)
+class HybridSearchResponse:
+    """Réponse complète de la recherche hybride."""
+
+    query: str
+    lexical_query: str
+
+    top_k_requested: int
+    dense_candidates_requested: int
+    bm25_candidates_requested: int
+
+    dense_results_found: int
+    bm25_results_found: int
+    fusion_candidates: int
+
+    dense_duration_ms: float
+    bm25_duration_ms: float
+    total_duration_ms: float
+
+    results: list[HybridSearchResult]
+
+
+def load_hybrid_config(
+    config_path: Path,
+) -> HybridConfig:
+    """Lire la section hybrid de retrieval.yaml."""
+
+    if not config_path.exists():
+        raise FileNotFoundError(
+            f"Configuration introuvable : {config_path}"
+        )
+
+    raw_config = yaml.safe_load(
+        config_path.read_text(encoding="utf-8")
+    )
+
+    if not isinstance(raw_config, dict):
+        raise ValueError(
+            "Le fichier retrieval.yaml est invalide."
+        )
+
+    hybrid_config = raw_config.get("hybrid")
+
+    if not isinstance(hybrid_config, dict):
+        raise ValueError(
+            "La section 'hybrid' est absente ou invalide."
+        )
+
+    return HybridConfig(
+        fusion_method=str(
+            hybrid_config.get(
+                "fusion_method",
+                "rrf",
+            )
+        ),
+        dense_candidate_k=int(
+            hybrid_config["dense_candidate_k"]
+        ),
+        bm25_candidate_k=int(
+            hybrid_config["bm25_candidate_k"]
+        ),
+        default_top_k=int(
+            hybrid_config["default_top_k"]
+        ),
+        rrf_k=int(
+            hybrid_config["rrf_k"]
+        ),
+        dense_weight=float(
+            hybrid_config["dense_weight"]
+        ),
+        bm25_weight=float(
+            hybrid_config["bm25_weight"]
+        ),
+        lexical_query_expansion=bool(
+            hybrid_config.get(
+                "lexical_query_expansion",
+                True,
+            )
+        ),
+        query_expansion_version=str(
+            hybrid_config.get(
+                "query_expansion_version",
+                "phosphoric_v1",
+            )
+        ),
+        pipeline_version=str(
+            hybrid_config.get(
+                "pipeline_version",
+                "unknown",
+            )
+        ),
+    )
+
+
+def normalize_query_for_matching(
+    query: str,
+) -> str:
+    """Normaliser une question pour détecter les expressions."""
+
+    normalized = unicodedata.normalize(
+        "NFKD",
+        query,
+    )
+
+    normalized = "".join(
+        character
+        for character in normalized
+        if not unicodedata.combining(character)
+    )
+
+    normalized = normalized.casefold()
+
+    return re.sub(
+        r"\s+",
+        " ",
+        normalized,
+    ).strip()
+
+
+def expand_lexical_query(
+    query: str,
+    *,
+    version: str = "phosphoric_v1",
+) -> str:
+    """Ajouter des équivalents anglais déterministes pour BM25."""
+
+    if version != "phosphoric_v1":
+        raise ValueError(
+            f"Version d'expansion inconnue : {version}"
+        )
+
+    normalized_query = normalize_query_for_matching(
+        query
+    )
+
+    expansions: list[str] = []
+
+    for source_phrase, target_phrases in _QUERY_EXPANSIONS:
+        if source_phrase not in normalized_query:
+            continue
+
+        for target_phrase in target_phrases:
+            if target_phrase not in expansions:
+                expansions.append(target_phrase)
+
+    if not expansions:
+        return query.strip()
+
+    return " ".join(
+        [
+            query.strip(),
+            *expansions,
+        ]
+    )
+
+
+class HybridRetriever:
+    """Fusionner les classements dense et BM25 avec RRF."""
+
+    def __init__(
+        self,
+        *,
+        dense_index_directory: Path,
+        bm25_index_directory: Path,
+        embedding_config_path: Path,
+        retrieval_config_path: Path,
+    ) -> None:
+        self.retrieval_config_path = (
+            retrieval_config_path.resolve()
+        )
+
+        self.config = load_hybrid_config(
+            self.retrieval_config_path
+        )
+
+        print("Chargement du retriever dense...")
+
+        self.dense_retriever = DenseRetriever(
+            index_directory=dense_index_directory,
+            embedding_config_path=embedding_config_path,
+        )
+
+        print("Chargement du retriever BM25...")
+
+        self.bm25_retriever = BM25Retriever(
+            index_directory=bm25_index_directory,
+            config_path=self.retrieval_config_path,
+        )
+
+        self._validate_corpus_alignment()
+
+    @property
+    def total_chunks(self) -> int:
+        """Nombre de chunks communs aux deux index."""
+
+        return len(self.dense_retriever.metadata)
+
+    def search(
+        self,
+        query: str,
+        *,
+        top_k: int | None = None,
+        dense_candidate_k: int | None = None,
+        bm25_candidate_k: int | None = None,
+        dense_minimum_score: float | None = None,
+        bm25_minimum_score: float | None = None,
+        document_ids: set[str] | None = None,
+        use_query_expansion: bool | None = None,
+    ) -> HybridSearchResponse:
+        """Exécuter les deux recherches puis fusionner leurs rangs."""
+
+        cleaned_query = query.strip()
+
+        if not cleaned_query:
+            raise ValueError(
+                "La requête hybride ne peut pas être vide."
+            )
+
+        effective_top_k = (
+            self.config.default_top_k
+            if top_k is None
+            else top_k
+        )
+
+        effective_dense_k = (
+            self.config.dense_candidate_k
+            if dense_candidate_k is None
+            else dense_candidate_k
+        )
+
+        effective_bm25_k = (
+            self.config.bm25_candidate_k
+            if bm25_candidate_k is None
+            else bm25_candidate_k
+        )
+
+        if effective_top_k <= 0:
+            raise ValueError(
+                "top_k doit être strictement positif."
+            )
+
+        if effective_dense_k <= 0:
+            raise ValueError(
+                "dense_candidate_k doit être positif."
+            )
+
+        if effective_bm25_k <= 0:
+            raise ValueError(
+                "bm25_candidate_k doit être positif."
+            )
+
+        expansion_enabled = (
+            self.config.lexical_query_expansion
+            if use_query_expansion is None
+            else use_query_expansion
+        )
+
+        lexical_query = (
+            expand_lexical_query(
+                cleaned_query,
+                version=(
+                    self.config.query_expansion_version
+                ),
+            )
+            if expansion_enabled
+            else cleaned_query
+        )
+
+        total_start = time.perf_counter()
+
+        dense_response = self.dense_retriever.search(
+            cleaned_query,
+            top_k=effective_dense_k,
+            minimum_score=dense_minimum_score,
+            document_ids=document_ids,
+        )
+
+        bm25_response = self.bm25_retriever.search(
+            lexical_query,
+            top_k=effective_bm25_k,
+            minimum_score=bm25_minimum_score,
+            document_ids=document_ids,
+        )
+
+        candidates: dict[str, _FusionCandidate] = {}
+
+        for result in dense_response.results:
+            chunk_id = result.chunk.chunk_id
+
+            candidate = candidates.setdefault(
+                chunk_id,
+                _FusionCandidate(
+                    chunk=result.chunk,
+                ),
+            )
+
+            candidate.dense_rank = result.rank
+            candidate.dense_score = result.score
+
+        for result in bm25_response.results:
+            chunk_id = result.chunk.chunk_id
+
+            candidate = candidates.setdefault(
+                chunk_id,
+                _FusionCandidate(
+                    chunk=result.chunk,
+                ),
+            )
+
+            candidate.bm25_rank = result.rank
+            candidate.bm25_score = result.score
+
+        ranked_candidates = sorted(
+            candidates.values(),
+            key=self._candidate_sort_key,
+        )
+
+        results = [
+            self._build_result(
+                candidate=candidate,
+                final_rank=rank,
+            )
+            for rank, candidate in enumerate(
+                ranked_candidates[:effective_top_k],
+                start=1,
+            )
+        ]
+
+        total_duration_ms = (
+            time.perf_counter() - total_start
+        ) * 1000
+
+        return HybridSearchResponse(
+            query=cleaned_query,
+            lexical_query=lexical_query,
+            top_k_requested=effective_top_k,
+            dense_candidates_requested=effective_dense_k,
+            bm25_candidates_requested=effective_bm25_k,
+            dense_results_found=len(
+                dense_response.results
+            ),
+            bm25_results_found=len(
+                bm25_response.results
+            ),
+            fusion_candidates=len(candidates),
+            dense_duration_ms=(
+                dense_response.search_duration_ms
+            ),
+            bm25_duration_ms=(
+                bm25_response.search_duration_ms
+            ),
+            total_duration_ms=round(
+                total_duration_ms,
+                3,
+            ),
+            results=results,
+        )
+
+    def _candidate_sort_key(
+        self,
+        candidate: _FusionCandidate,
+    ) -> tuple[float, int, int, str]:
+        """Produire un ordre stable et déterministe."""
+
+        rrf_score = self._calculate_rrf_score(
+            candidate
+        )
+
+        matched_retrievers = int(
+            candidate.dense_rank is not None
+        ) + int(
+            candidate.bm25_rank is not None
+        )
+
+        ranks = [
+            rank
+            for rank in (
+                candidate.dense_rank,
+                candidate.bm25_rank,
+            )
+            if rank is not None
+        ]
+
+        best_rank = min(ranks)
+
+        return (
+            -rrf_score,
+            -matched_retrievers,
+            best_rank,
+            candidate.chunk.chunk_id,
+        )
+
+    def _calculate_rrf_score(
+        self,
+        candidate: _FusionCandidate,
+    ) -> float:
+        """Calculer la somme des contributions RRF."""
+
+        dense_contribution = self._rrf_contribution(
+            rank=candidate.dense_rank,
+            weight=self.config.dense_weight,
+        )
+
+        bm25_contribution = self._rrf_contribution(
+            rank=candidate.bm25_rank,
+            weight=self.config.bm25_weight,
+        )
+
+        return dense_contribution + bm25_contribution
+
+    def _build_result(
+        self,
+        *,
+        candidate: _FusionCandidate,
+        final_rank: int,
+    ) -> HybridSearchResult:
+        """Construire le résultat final détaillé."""
+
+        dense_contribution = self._rrf_contribution(
+            rank=candidate.dense_rank,
+            weight=self.config.dense_weight,
+        )
+
+        bm25_contribution = self._rrf_contribution(
+            rank=candidate.bm25_rank,
+            weight=self.config.bm25_weight,
+        )
+
+        matched_retrievers: list[str] = []
+
+        if candidate.dense_rank is not None:
+            matched_retrievers.append("dense")
+
+        if candidate.bm25_rank is not None:
+            matched_retrievers.append("bm25")
+
+        return HybridSearchResult(
+            rank=final_rank,
+            rrf_score=(
+                dense_contribution
+                + bm25_contribution
+            ),
+            matched_retrievers=tuple(
+                matched_retrievers
+            ),
+            dense_rank=candidate.dense_rank,
+            dense_score=candidate.dense_score,
+            dense_rrf_contribution=(
+                dense_contribution
+            ),
+            bm25_rank=candidate.bm25_rank,
+            bm25_score=candidate.bm25_score,
+            bm25_rrf_contribution=(
+                bm25_contribution
+            ),
+            chunk=candidate.chunk,
+        )
+
+    def _rrf_contribution(
+        self,
+        *,
+        rank: int | None,
+        weight: float,
+    ) -> float:
+        """Calculer la contribution d'un moteur."""
+
+        if rank is None:
+            return 0.0
+
+        return weight / (
+            self.config.rrf_k + rank
+        )
+
+    def _validate_corpus_alignment(self) -> None:
+        """Vérifier que FAISS et BM25 indexent le même corpus."""
+
+        dense_chunks = self.dense_retriever.metadata
+        bm25_chunks = self.bm25_retriever.metadata
+
+        if len(dense_chunks) != len(bm25_chunks):
+            raise ValueError(
+                "Les index dense et BM25 ne contiennent pas "
+                "le même nombre de chunks : "
+                f"{len(dense_chunks)} != {len(bm25_chunks)}."
+            )
+
+        dense_ids = [
+            chunk.chunk_id
+            for chunk in dense_chunks
+        ]
+
+        bm25_ids = [
+            chunk.chunk_id
+            for chunk in bm25_chunks
+        ]
+
+        if dense_ids != bm25_ids:
+            raise ValueError(
+                "Les chunks des index dense et BM25 ne sont "
+                "pas identiques ou ne sont pas dans le même ordre."
+            )
+
+        for dense_chunk, bm25_chunk in zip(
+            dense_chunks,
+            bm25_chunks,
+            strict=True,
+        ):
+            if (
+                dense_chunk.document_id
+                != bm25_chunk.document_id
+            ):
+                raise ValueError(
+                    f"{dense_chunk.chunk_id} : document_id "
+                    "différent entre les deux index."
+                )
+
+            if (
+                dense_chunk.source_pages
+                != bm25_chunk.source_pages
+            ):
+                raise ValueError(
+                    f"{dense_chunk.chunk_id} : pages sources "
+                    "différentes entre les deux index."
+                )
+
+            if dense_chunk.text != bm25_chunk.text:
+                raise ValueError(
+                    f"{dense_chunk.chunk_id} : texte différent "
+                    "entre les deux index."
+                )

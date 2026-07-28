@@ -1,0 +1,311 @@
+"""Deterministic claim-to-citation support diagnostics and production guards."""
+
+from __future__ import annotations
+
+import re
+import unicodedata
+from dataclasses import dataclass
+from enum import StrEnum
+
+from phosprocess.rag.citations import CitationValidationError
+from phosprocess.retrieval.evidence_bundle import EvidenceBundle
+
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+_CITATION = re.compile(r"\[Source ([1-5])\]")
+_TOKEN = re.compile(r"(?u)[^\W_]{2,}")
+_NUMBER = re.compile(r"(?<!\w)\d+(?:[.,]\d+)?\s*%?")
+_LIST_PREFIX = re.compile(r"^\s*\d+[.)]\s*")
+_STOPWORDS = {
+    "avec",
+    "dans",
+    "des",
+    "est",
+    "les",
+    "pour",
+    "that",
+    "the",
+    "this",
+    "une",
+    "with",
+}
+
+# Canonical relation concepts are deliberately limited to process transitions.
+# They catch statements such as "the acid enters the flash chamber" when the
+# cited passage mentions evaporation but never states an inlet or flash chamber.
+_RELATION_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "inlet": (
+        "feed inlet",
+        "feedstock enters",
+        "is admitted",
+        "enters",
+        "introduced",
+        "alimentation",
+        "entre dans",
+        "introduit",
+        "admis",
+    ),
+    "pump": ("pump", "pumped", "pompe", "pompé", "pompee"),
+    "heat_exchanger": (
+        "heat exchanger",
+        "heating element",
+        "heating surface",
+        "échangeur",
+        "element de chauffage",
+        "élément de chauffage",
+    ),
+    "flash_chamber": (
+        "flash chamber",
+        "vapor body",
+        "vapour body",
+        "chambre de flash",
+        "chambre de vaporisation",
+        "bouilleur",
+    ),
+    "return": (
+        "returned",
+        "return line",
+        "reintroduced",
+        "recirculation line",
+        "renvoyé",
+        "renvoye",
+        "retour",
+        "réintroduit",
+        "reintroduit",
+        "recyclage",
+    ),
+    "outlet": (
+        "product outlet",
+        "withdrawn",
+        "withdrawal",
+        "leaves",
+        "sortie",
+        "soutirage",
+        "récupéré",
+        "recupere",
+        "évacué",
+        "evacue",
+    ),
+    "vacuum": (
+        "under reduced pressure",
+        "under vacuum",
+        "vacuum",
+        "sous vide",
+        "pression réduite",
+        "pression reduite",
+    ),
+    "evaporation": (
+        "evaporation",
+        "vaporization",
+        "vapourisation",
+        "boiling",
+        "évaporation",
+        "vaporisation",
+        "ébullition",
+        "ebullition",
+    ),
+    "downstream": (
+        "next treatment",
+        "following stage",
+        "downstream",
+        "étape suivante",
+        "etape suivante",
+        "traitement suivant",
+    ),
+}
+
+_NUMBER_WORDS = {
+    "deux": "2",
+    "trois": "3",
+    "four": "4",
+    "three": "3",
+    "two": "2",
+}
+
+
+class ClaimSupportStatus(StrEnum):
+    """Deterministic support classes for smoke tests."""
+
+    SUPPORTED = "supported"
+    PARTIALLY_SUPPORTED = "partially_supported"
+    UNSUPPORTED = "unsupported"
+    CITATION_MISSING = "citation_missing"
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimSupport:
+    """One answer claim and its cited-evidence overlap."""
+
+    claim: str
+    cited_sources: tuple[int, ...]
+    status: ClaimSupportStatus
+    lexical_coverage: float
+
+
+def _normalize(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    without_marks = "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character)
+    )
+    return re.sub(r"\s+", " ", without_marks).strip()
+
+
+def _tokens(text: str) -> set[str]:
+    normalized = _normalize(text)
+    return {
+        token
+        for token in _TOKEN.findall(normalized)
+        if token not in _STOPWORDS
+    }
+
+
+def _concepts(text: str) -> set[str]:
+    normalized = _normalize(text)
+    return {
+        concept
+        for concept, phrases in _RELATION_CONCEPTS.items()
+        if any(_normalize(phrase) in normalized for phrase in phrases)
+    }
+
+
+def _numbers(text: str) -> set[str]:
+    normalized = _LIST_PREFIX.sub("", _normalize(text))
+    found = {
+        match.group(0).replace(" ", "").replace(",", ".")
+        for match in _NUMBER.finditer(normalized)
+    }
+
+    for word, value in _NUMBER_WORDS.items():
+        if re.search(rf"\b{re.escape(word)}\b", normalized):
+            found.add(value)
+
+    return found
+
+
+def evaluate_claim_support(
+    answer: str,
+    bundles: list[EvidenceBundle],
+) -> list[ClaimSupport]:
+    """Flag likely unsupported claims without a production LLM call."""
+
+    bundle_by_number = {bundle.source_number: bundle for bundle in bundles}
+    results: list[ClaimSupport] = []
+
+    for raw_claim in _SENTENCE.split(answer):
+        claim = raw_claim.strip()
+
+        if not claim:
+            continue
+
+        citations = tuple(
+            dict.fromkeys(int(match) for match in _CITATION.findall(claim))
+        )
+        claim_without_citations = _CITATION.sub("", claim).strip()
+        claim_tokens = _tokens(claim_without_citations)
+
+        if not citations:
+            results.append(
+                ClaimSupport(
+                    claim=claim_without_citations,
+                    cited_sources=(),
+                    status=ClaimSupportStatus.CITATION_MISSING,
+                    lexical_coverage=0.0,
+                )
+            )
+            continue
+
+        evidence_text = " ".join(
+            bundle_by_number[source_number].display_text
+            for source_number in citations
+            if source_number in bundle_by_number
+        )
+        evidence_tokens = _tokens(evidence_text)
+        coverage = (
+            len(claim_tokens & evidence_tokens) / len(claim_tokens)
+            if claim_tokens
+            else 0.0
+        )
+        missing_concepts = _concepts(claim_without_citations) - _concepts(
+            evidence_text
+        )
+        missing_numbers = _numbers(claim_without_citations) - _numbers(
+            evidence_text
+        )
+
+        if missing_concepts or missing_numbers:
+            status = ClaimSupportStatus.UNSUPPORTED
+        elif coverage >= 0.5:
+            status = ClaimSupportStatus.SUPPORTED
+        elif coverage >= 0.2:
+            status = ClaimSupportStatus.PARTIALLY_SUPPORTED
+        else:
+            status = ClaimSupportStatus.UNSUPPORTED
+
+        results.append(
+            ClaimSupport(
+                claim=claim_without_citations,
+                cited_sources=citations,
+                status=status,
+                lexical_coverage=round(coverage, 4),
+            )
+        )
+
+    return results
+
+
+def validate_claim_support(
+    answer: str,
+    bundles: list[EvidenceBundle],
+) -> None:
+    """Reject clear relation/number hallucinations in cited quality answers.
+
+    This production guard is intentionally conservative. It rejects only claims
+    whose cited evidence lacks an explicit process-transition concept or a
+    numerical value stated by the claim. General paraphrases remain governed by
+    the prompt and offline fidelity report, avoiding false rejection of valid
+    French answers grounded in English passages.
+    """
+
+    bundle_by_number = {bundle.source_number: bundle for bundle in bundles}
+    unsupported: list[str] = []
+
+    for raw_claim in _SENTENCE.split(answer):
+        claim = raw_claim.strip()
+
+        if not claim:
+            continue
+
+        citations = tuple(
+            dict.fromkeys(int(match) for match in _CITATION.findall(claim))
+        )
+
+        if not citations:
+            continue
+
+        clean_claim = _CITATION.sub("", claim).strip()
+        evidence_text = " ".join(
+            bundle_by_number[source_number].display_text
+            for source_number in citations
+            if source_number in bundle_by_number
+        )
+        missing_concepts = _concepts(clean_claim) - _concepts(evidence_text)
+        missing_numbers = _numbers(clean_claim) - _numbers(evidence_text)
+
+        if missing_concepts or missing_numbers:
+            details: list[str] = []
+
+            if missing_concepts:
+                details.append("relations=" + ",".join(sorted(missing_concepts)))
+
+            if missing_numbers:
+                details.append("valeurs=" + ",".join(sorted(missing_numbers)))
+
+            unsupported.append(f"{clean_claim} ({'; '.join(details)})")
+
+    if unsupported:
+        raise CitationValidationError(
+            "Certaines affirmations ne sont pas explicitement soutenues par "
+            "leurs sources citées. Supprimez-les ou utilisez la réponse "
+            "d'insuffisance : " + " | ".join(unsupported[:3])
+        )

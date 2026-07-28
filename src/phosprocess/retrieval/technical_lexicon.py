@@ -1,0 +1,36 @@
+"""Small deterministic multilingual lexicon for technical query expansion."""
+
+from __future__ import annotations
+
+TECHNICAL_EQUIVALENTS: dict[str, tuple[str, ...]] = {
+    "évaporateur à circulation forcée": ("forced-circulation evaporator",),
+    "acide phosphorique": ("phosphoric acid",),
+    "bouilleur": ("boiler", "reboiler", "vapor body"),
+    "échangeur thermique": ("heat exchanger",),
+    "chambre de vaporisation": ("vapor chamber", "flash chamber"),
+    "sursaturation": ("supersaturation",),
+    "nucléation": ("nucleation",),
+    "croissance cristalline": ("crystal growth",),
+    "gypse": ("gypsum", "calcium sulfate"),
+    "transfert thermique": ("heat transfer",),
+    "coefficient global": ("overall heat-transfer coefficient",),
+    "pression de vapeur": ("vapor pressure",),
+    "chaleur latente": ("latent heat",),
+    "enthalpie": ("enthalpy",),
+    "débit": ("flow rate",),
+    "perte de charge": ("pressure drop",),
+    "recirculation": ("recirculation",),
+    "pompe de circulation": ("circulation pump",),
+    "vapeur de chauffage": ("heating steam",),
+    "régulation": ("process control",),
+    "variable manipulée": ("manipulated variable",),
+    "variable contrôlée": ("controlled variable",),
+    "مبخر ذو الدوران القسري": ("forced-circulation evaporator",),
+    "المبخر": ("evaporator",),
+    "حمض الفوسفوريك": ("phosphoric acid",),
+    "مبادل حراري": ("heat exchanger",),
+    "المبادل الحراري": ("heat exchanger",),
+    "الاتساخ": ("fouling",),
+    "فرط التشبع": ("supersaturation",),
+    "التنوي": ("nucleation",),
+}

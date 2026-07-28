@@ -1,0 +1,1284 @@
+"""Créer la version initiale du benchmark PhosProcess."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+from collections import Counter
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from phosprocess.evaluation.schemas import (
+    DatasetSplit,
+    EvaluationQuery,
+    QueryCategory,
+    QueryDifficulty,
+    QueryLanguage,
+    load_evaluation_config,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+CONFIG_PATH = (
+    PROJECT_ROOT
+    / "configs"
+    / "evaluation.yaml"
+)
+
+BECKER = "01_becker_phosphates_and_phosphoric_acid"
+JACOBS = "02_jacobs_largest_phosphoric_acid_plant"
+UNIDO = "03_unido_phosphate_process_technologies"
+WORKSHOP = "04_rapport_atelier_acide_phosphorique"
+
+
+def answered(
+    index: int,
+    question: str,
+    language: QueryLanguage,
+    category: QueryCategory,
+    difficulty: QueryDifficulty,
+    split: DatasetSplit,
+    family: str,
+    expected_answer: str,
+    references: list[str],
+    notes: str = "",
+) -> EvaluationQuery:
+    """Créer une question répondable."""
+
+    return EvaluationQuery(
+        query_id=f"Q{index:03d}",
+        question=question,
+        language=language,
+        category=category,
+        difficulty=difficulty,
+        answerable=True,
+        split=split,
+        question_family_id=family,
+        expected_answer=expected_answer,
+        notes=notes,
+        reference_documents=references,
+    )
+
+
+def unanswered(
+    index: int,
+    question: str,
+    language: QueryLanguage,
+    difficulty: QueryDifficulty,
+    split: DatasetSplit,
+    family: str,
+    notes: str,
+) -> EvaluationQuery:
+    """Créer une question volontairement non répondable."""
+
+    return EvaluationQuery(
+        query_id=f"Q{index:03d}",
+        question=question,
+        language=language,
+        category=QueryCategory.UNANSWERABLE,
+        difficulty=difficulty,
+        answerable=False,
+        split=split,
+        question_family_id=family,
+        expected_answer=None,
+        notes=notes,
+        reference_documents=[],
+    )
+
+
+def build_queries() -> list[EvaluationQuery]:
+    """Construire les 48 questions du benchmark v0.1."""
+
+    return [
+        # -------------------------------------------------
+        # DEV — 16 répondables
+        # -------------------------------------------------
+        answered(
+            1,
+            (
+                "Quel est le rapport de recirculation externe "
+                "habituel d'un réacteur Jacobs ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "jacobs_external_recirculation",
+            (
+                "Le rapport entre la bouillie circulante et "
+                "l'alimentation du filtre est de 40:1."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            2,
+            (
+                "What induced internal recirculation ratio was "
+                "measured in the annulus of the Jacobs reactor?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "jacobs_internal_recirculation",
+            (
+                "Dye tests indicated an induced internal "
+                "recirculation ratio of approximately 20:1."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            3,
+            (
+                "Dans le single-tank reactor, quel recirculation "
+                "ratio est induit par l'agitateur central ?"
+            ),
+            QueryLanguage.MIXED,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "single_tank_recirculation",
+            "Le rapport de recirculation indiqué est de 330:1.",
+            [JACOBS],
+        ),
+        answered(
+            4,
+            (
+                "Pourquoi une forte supersaturation produit-elle "
+                "de petits cristaux de gypse difficiles à filtrer ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "supersaturation_nucleation_filterability",
+            (
+                "Au-dessus de la limite de supersaturation, la "
+                "nucléation spontanée crée un très grand nombre "
+                "de noyaux. La matière disponible se répartit "
+                "entre davantage de cristaux, qui restent donc "
+                "petits et se filtrent mal."
+            ),
+            [BECKER, JACOBS],
+        ),
+        answered(
+            5,
+            (
+                "Why does a high fraction of small gypsum "
+                "crystals reduce filtration performance?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "small_crystals_filter_cake",
+            (
+                "Small crystals increase the surface-to-volume "
+                "ratio and form a less porous filter cake, making "
+                "phosphoric acid and wash liquor flow more slowly."
+            ),
+            [BECKER],
+        ),
+        answered(
+            6,
+            (
+                "Pourquoi une recirculation très élevée rend-elle "
+                "un réacteur à cuve unique homogène tout en pouvant "
+                "limiter la croissance des cristaux ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.HARD,
+            DatasetSplit.DEV,
+            "single_tank_homogeneity_tradeoff",
+            (
+                "La forte recirculation disperse rapidement la "
+                "roche et l'acide sulfurique, ce qui réduit les "
+                "variations locales et la nucléation spontanée. "
+                "Mais elle empêche aussi d'atteindre localement "
+                "les concentrations de sulfate et les vitesses de "
+                "croissance observées dans les réacteurs à "
+                "écoulement progressif."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            7,
+            (
+                "Quelles sont les principales étapes de production "
+                "de l'acide phosphorique par voie humide dihydrate ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.EASY,
+            DatasetSplit.DEV,
+            "wet_process_dihydrate_steps",
+            (
+                "La roche phosphatée est attaquée par l'acide "
+                "sulfurique, le sulfate de calcium dihydrate "
+                "cristallise, l'acide est séparé du gypse par "
+                "filtration et lavage, puis l'acide faible peut "
+                "être concentré par évaporation."
+            ),
+            [BECKER, UNIDO, WORKSHOP],
+        ),
+        answered(
+            8,
+            (
+                "What is the purpose of maturing the filter-feed "
+                "slurry for 20 to 30 minutes?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "filter_feed_maturation_purpose",
+            (
+                "The maturation period removes remaining gypsum "
+                "supersaturation and allows crystallization to "
+                "continue before filtration."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            9,
+            (
+                "Que doit vérifier l'opérateur lorsqu'il observe "
+                "un grand nombre de petits cristaux ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "diagnosis_many_small_crystals",
+            (
+                "Il doit vérifier le taux de sulfate, la teneur en "
+                "solides, les dispositifs de mélange de l'acide "
+                "sulfurique, les agitateurs, leur puissance et la "
+                "fiabilité du densimètre de bouillie."
+            ),
+            [BECKER],
+        ),
+        answered(
+            10,
+            (
+                "Which checks are recommended when crystals look "
+                "normal but filtration remains poor?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.HARD,
+            DatasetSplit.DEV,
+            "diagnosis_normal_crystals_poor_filtration",
+            (
+                "Check the F/SiO2 ratio and active silica, test "
+                "flocculants, inspect the filter cloth and verify "
+                "the vacuum level."
+            ),
+            [BECKER],
+        ),
+        answered(
+            11,
+            (
+                "Quelle différence fondamentale sépare les "
+                "réacteurs Jacobs ou Prayon des réacteurs à grande "
+                "cuve unique ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.PROCESS_COMPARISON,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "progressive_flow_vs_single_tank",
+            (
+                "Jacobs et Prayon font circuler progressivement la "
+                "bouillie dans un long chemin de réaction avec des "
+                "points séparés d'ajout de roche et d'acide. Les "
+                "systèmes à cuve unique utilisent un agitateur "
+                "central et une recirculation très élevée."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            12,
+            (
+                "How does the product-acid concentration of a "
+                "dihydrate process compare with a hemihydrate "
+                "process?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.PROCESS_COMPARISON,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "dihydrate_vs_hemihydrate_concentration",
+            (
+                "A dihydrate process commonly produces about "
+                "25-31 wt% P2O5 acid, while hemihydrate routes can "
+                "produce a substantially more concentrated acid."
+            ),
+            [BECKER, UNIDO],
+        ),
+        answered(
+            13,
+            (
+                "Quelles sont les productivités de réacteur Jacobs "
+                "de conception et réellement atteinte ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.TABLE_DATA,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "jacobs_reactor_productivity_table",
+            (
+                "La productivité de conception est de "
+                "0,49 t/m3/j et la productivité atteinte est de "
+                "1,2 t/m3/j."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            14,
+            (
+                "For Jacobs, what were the designed and achieved "
+                "filter productivities in t/m2/day?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.TABLE_DATA,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.DEV,
+            "jacobs_filter_productivity_table",
+            (
+                "The designed filter productivity was "
+                "4.8 t/m2/day and the achieved value was "
+                "12 t/m2/day."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            15,
+            (
+                "Quelles catégories de pertes de P2O5 doivent être "
+                "prises en compte dans le procédé humide ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.IMPURITIES_LOSSES_CORROSION,
+            QueryDifficulty.HARD,
+            DatasetSplit.DEV,
+            "p2o5_loss_categories",
+            (
+                "Les pertes incluent la co-cristallisation dans le "
+                "sulfate de calcium, l'imprégnation du gâteau, la "
+                "roche non attaquée, les pertes mécaniques et les "
+                "pertes associées à l'élimination des boues."
+            ),
+            [BECKER],
+        ),
+        answered(
+            16,
+            (
+                "Why can intermediate clarification near "
+                "40% P2O5 be preferable to clarification only at "
+                "50-52% P2O5?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.IMPURITIES_LOSSES_CORROSION,
+            QueryDifficulty.HARD,
+            DatasetSplit.DEV,
+            "intermediate_clarification_benefits",
+            (
+                "At roughly 40% P2O5 the acid has lower viscosity "
+                "and specific gravity, settling and filtration are "
+                "easier, sludge carries less P2O5, and most "
+                "impurities have already reached low solubility."
+            ),
+            [BECKER],
+        ),
+
+        # -------------------------------------------------
+        # DEV — 4 non répondables
+        # -------------------------------------------------
+        unanswered(
+            17,
+            (
+                "Quelle est la température actuelle du réacteur "
+                "Jacobs de l'atelier PMP ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.DEV,
+            "current_reactor_temperature",
+            "Le corpus ne contient aucune mesure temps réel.",
+        ),
+        unanswered(
+            18,
+            (
+                "Quel est le taux de SO4 mesuré dans l'atelier "
+                "à cet instant précis ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.DEV,
+            "current_sulfate_measurement",
+            "Question temps réel absente des documents statiques.",
+        ),
+        unanswered(
+            19,
+            (
+                "What is the serial number of the slurry "
+                "recirculation pump currently installed at PMP?"
+            ),
+            QueryLanguage.EN,
+            QueryDifficulty.EASY,
+            DatasetSplit.DEV,
+            "pump_serial_number",
+            "Aucun numéro de série d'équipement n'est disponible.",
+        ),
+        unanswered(
+            20,
+            (
+                "Quel opérateur est actuellement responsable du "
+                "quart de nuit ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.DEV,
+            "current_shift_operator",
+            "Le corpus ne contient pas de planning des équipes.",
+        ),
+
+        # -------------------------------------------------
+        # TEST — 24 répondables
+        # -------------------------------------------------
+        answered(
+            21,
+            (
+                "Quel rapport total de recirculation est indiqué "
+                "sur le schéma de cristallisation Jacobs ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "jacobs_total_recirculation",
+            "Le schéma indique un rapport total de 60:1.",
+            [JACOBS],
+        ),
+        answered(
+            22,
+            (
+                "What sulfate concentration does the slurry "
+                "returning from the vacuum cooler seal tank have?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "vacuum_cooler_return_sulfate",
+            (
+                "The returning slurry is described as containing "
+                "2.65% w/w SO4."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            23,
+            (
+                "Combien de temps la bouillie d'alimentation du "
+                "filtre est-elle maturée dans le procédé Jacobs ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "jacobs_filter_feed_maturation_time",
+            "La durée indiquée est de 20 à 30 minutes.",
+            [JACOBS],
+        ),
+        answered(
+            24,
+            (
+                "Pour quelle disponibilité annuelle l'unité "
+                "Jacobs décrite a-t-elle été conçue ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "jacobs_design_availability",
+            "L'unité est conçue pour une disponibilité de 95%.",
+            [JACOBS],
+        ),
+        answered(
+            25,
+            (
+                "How many forced-circulation evaporation units "
+                "were operating and how many were spare?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.EXACT_NUMERIC,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "jacobs_evaporator_unit_count",
+            (
+                "There were five operating units and one spare "
+                "unit."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            26,
+            (
+                "Pourquoi le surbroyage d'une roche poreuse peut-il "
+                "dégrader la cristallisation et la filtration ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "overgrinding_hyperreactivity",
+            (
+                "Le surbroyage peut créer une hyperréactivité, des "
+                "déplétions locales de sulfate, davantage de "
+                "co-cristallisation et de petits cristaux de gypse "
+                "mal filtrables."
+            ),
+            [BECKER],
+        ),
+        answered(
+            27,
+            (
+                "Why should phosphoric acid not boil inside the "
+                "evaporator heat-exchanger tubes?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "evaporator_no_tube_boiling",
+            (
+                "Boiling inside the tubes would intensify scaling "
+                "and heat-transfer problems. The system therefore "
+                "uses vacuum and hydrostatic head so boiling occurs "
+                "mainly at the liquid surface in the separator."
+            ),
+            [BECKER],
+        ),
+        answered(
+            28,
+            (
+                "Quel est l'intérêt d'une forte recirculation "
+                "d'acide dans un évaporateur à circulation forcée ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "evaporator_large_acid_recirculation",
+            (
+                "Elle limite l'élévation de température entre "
+                "l'entrée et la sortie, évite l'ébullition dans "
+                "les tubes, augmente la vitesse du fluide et "
+                "améliore le coefficient de transfert thermique."
+            ),
+            [BECKER],
+        ),
+        answered(
+            29,
+            (
+                "Pourquoi l'enrobage de la roche par de petits "
+                "cristaux de gypse peut-il provoquer des "
+                "oscillations du taux de sulfate ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "rock_occlusion_sulfate_instability",
+            (
+                "L'enrobage ralentit la dissolution de la roche, "
+                "ce qui fait monter le sulfate. Les corrections "
+                "successives du débit d'acide sulfurique peuvent "
+                "ensuite provoquer des alternances de taux élevés "
+                "et faibles."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            30,
+            (
+                "Why is induced recirculation useful when treating "
+                "low-grade or impurity-rich phosphate rock?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.CAUSAL_MECHANISM,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "induced_recirculation_low_grade_rock",
+            (
+                "The induced recirculation improves mixing, "
+                "operational stability and tolerance to low-grade, "
+                "less reactive rock containing iron, aluminum or "
+                "magnesium."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            31,
+            (
+                "Que se passe-t-il lorsque le réacteur fonctionne "
+                "au-dessus de la ligne de supersaturation ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "operation_above_supersaturation_line",
+            (
+                "Une nucléation spontanée se produit et forme des "
+                "millions de très petits cristaux ou noyaux."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            32,
+            (
+                "What are the principal components of a phosphoric "
+                "acid concentration unit?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "acid_concentration_unit_components",
+            (
+                "The unit includes a heat exchanger, vapor body or "
+                "boiler chamber, condenser, vacuum pump, acid "
+                "circulation pump and connecting pipes."
+            ),
+            [BECKER],
+        ),
+        answered(
+            33,
+            (
+                "Comment le gypse sous-produit est-il évacué après "
+                "les quatre lavages des filtres ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "gypsum_disposal_after_washing",
+            (
+                "Le gypse est mis en suspension avec de l'eau de "
+                "bassin puis pompé vers une aire de stockage du "
+                "gypse."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            34,
+            (
+                "What happens to the evaporator overhead before "
+                "the gases leave the fluorine-recovery section?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.PROCESS_DESCRIPTION,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "evaporator_overhead_fluorine_recovery",
+            (
+                "The overhead passes through an entrainment "
+                "separator that removes phosphoric acid droplets, "
+                "then through a fluorine scrubber producing about "
+                "18% fluosilicic acid."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            35,
+            (
+                "Quelles conditions peuvent provoquer des cristaux "
+                "de gypse en forme d'aiguilles ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "needle_crystal_diagnosis",
+            (
+                "Les cristaux en aiguilles sont associés à un taux "
+                "de sulfate élevé ou à une température de réaction "
+                "élevée. Il faut revérifier l'analyse SO4 et la "
+                "température."
+            ),
+            [BECKER],
+        ),
+        answered(
+            36,
+            (
+                "What operating condition is associated with "
+                "lozenge-shaped gypsum crystals?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.MEDIUM,
+            DatasetSplit.TEST,
+            "lozenge_crystal_diagnosis",
+            (
+                "Lozenge-shaped crystals are associated with a low "
+                "sulfate level."
+            ),
+            [BECKER],
+        ),
+        answered(
+            37,
+            (
+                "Si les cristaux semblent normaux mais que le "
+                "gâteau filtre mal, quelle impureté doit être "
+                "suspectée ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "reactive_silica_poor_filtration",
+            (
+                "Un excès de silice réactive ou amorphe peut "
+                "boucher les capillaires du gâteau. Il faut vérifier "
+                "le rapport F/SiO2 et l'analyse de silice active."
+            ),
+            [BECKER],
+        ),
+        answered(
+            38,
+            (
+                "How can an abnormally high slurry-solids content "
+                "lead to many small crystals?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.OPERATOR_DIAGNOSIS,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "high_solids_small_crystals",
+            (
+                "High solids make effective mixing more difficult, "
+                "which can create local hypersaturation and "
+                "excessive nucleation."
+            ),
+            [BECKER],
+        ),
+        answered(
+            39,
+            (
+                "Comment les performances Jacobs et Prayon se "
+                "comparent-elles dans le tableau des productivités ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.PROCESS_COMPARISON,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "jacobs_prayon_productivity_comparison",
+            (
+                "Les deux procédés à écoulement progressif "
+                "atteignent des productivités de réacteur et de "
+                "filtre proches, notamment environ 12 t/m2/j pour "
+                "la filtration atteinte."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            40,
+            (
+                "Why was the achieved Raytheon filter productivity "
+                "lower than that of Jacobs and Prayon?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.PROCESS_COMPARISON,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "raytheon_filterability_comparison",
+            (
+                "The single-tank high-recirculation system tends "
+                "to produce smaller, less filterable gypsum. Its "
+                "achieved filter productivity was 6 t/m2/day "
+                "versus roughly 12 for the progressive-flow "
+                "systems."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            41,
+            (
+                "Quelles productivités atteintes de réacteur et de "
+                "filtre sont indiquées pour l'ancien Prayon ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.TABLE_DATA,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "prayon_old_achieved_productivity",
+            (
+                "L'ancien Prayon atteint 1,3 t/m3/j pour le "
+                "réacteur et 12 t/m2/j pour le filtre."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            42,
+            (
+                "What achieved filter productivity and capacity "
+                "over nameplate are listed for Raytheon?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.TABLE_DATA,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "raytheon_table_values",
+            (
+                "The achieved filter productivity is 6 t/m2/day "
+                "and the achieved capacity over nameplate is 1.72."
+            ),
+            [JACOBS],
+        ),
+        answered(
+            43,
+            (
+                "Comment les impuretés Al2O3 et K2O peuvent-elles "
+                "augmenter les pertes de P2O5 ?"
+            ),
+            QueryLanguage.FR,
+            QueryCategory.IMPURITIES_LOSSES_CORROSION,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "impurities_sludge_p2o5_losses",
+            (
+                "Ces impuretés favorisent la formation de boues "
+                "contenant des composés phosphatés insolubles, ce "
+                "qui entraîne des pertes de P2O5 lors de "
+                "l'élimination des boues."
+            ),
+            [BECKER],
+        ),
+        answered(
+            44,
+            (
+                "Why do corrosion and scaling strongly constrain "
+                "the design of phosphoric-acid evaporators?"
+            ),
+            QueryLanguage.EN,
+            QueryCategory.IMPURITIES_LOSSES_CORROSION,
+            QueryDifficulty.HARD,
+            DatasetSplit.TEST,
+            "evaporator_corrosion_scaling_constraints",
+            (
+                "Aggressive phosphoric acid limits usable "
+                "materials, while scaling degrades heat transfer "
+                "and requires low temperature differences, high "
+                "circulation and equipment that can be cleaned."
+            ),
+            [BECKER],
+        ),
+
+        # -------------------------------------------------
+        # TEST — 4 non répondables
+        # -------------------------------------------------
+        unanswered(
+            45,
+            (
+                "Quel rendement réel de récupération P2O5 a été "
+                "mesuré dans l'atelier en juillet 2026 ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.TEST,
+            "july_2026_recovery",
+            "Le corpus ne contient aucun bilan mensuel de 2026.",
+        ),
+        unanswered(
+            46,
+            (
+                "What is the next scheduled descaling date for "
+                "evaporator train K?"
+            ),
+            QueryLanguage.EN,
+            QueryDifficulty.EASY,
+            DatasetSplit.TEST,
+            "next_descaling_date",
+            "Aucun calendrier de maintenance futur n'est fourni.",
+        ),
+        unanswered(
+            47,
+            (
+                "Quelle est la vibration actuelle de l'agitateur "
+                "numéro 4 ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.TEST,
+            "current_agitator_vibration",
+            "Le corpus ne contient pas de données capteur temps réel.",
+        ),
+        unanswered(
+            48,
+            (
+                "Quel est le stock actuel du réservoir d'acide "
+                "sulfurique alimentant l'attaque ?"
+            ),
+            QueryLanguage.FR,
+            QueryDifficulty.EASY,
+            DatasetSplit.TEST,
+            "current_sulfuric_acid_inventory",
+            "Aucune information d'inventaire temps réel.",
+        ),
+    ]
+
+
+def resolve_project_path(
+    path_value: str,
+) -> Path:
+    """Résoudre un chemin relativement au projet."""
+
+    path = Path(path_value)
+
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+
+    return path.resolve()
+
+
+def sha256_file(path: Path) -> str:
+    """Calculer l'empreinte SHA-256."""
+
+    digest = hashlib.sha256()
+
+    with path.open("rb") as source:
+        for block in iter(
+            lambda: source.read(1024 * 1024),
+            b"",
+        ):
+            digest.update(block)
+
+    return digest.hexdigest()
+
+
+def write_jsonl(
+    records: list[EvaluationQuery],
+    path: Path,
+) -> None:
+    """Écrire les questions au format JSONL."""
+
+    temporary_path = path.with_suffix(
+        path.suffix + ".tmp"
+    )
+
+    with temporary_path.open(
+        "w",
+        encoding="utf-8",
+        newline="\n",
+    ) as output:
+        for record in records:
+            output.write(
+                json.dumps(
+                    record.model_dump(mode="json"),
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+    temporary_path.replace(path)
+
+
+def write_json(
+    data: dict[str, Any],
+    path: Path,
+) -> None:
+    """Écrire un objet JSON atomiquement."""
+
+    temporary_path = path.with_suffix(
+        path.suffix + ".tmp"
+    )
+
+    temporary_path.write_text(
+        json.dumps(
+            data,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    temporary_path.replace(path)
+
+
+def validate_expected_counts(
+    queries: list[EvaluationQuery],
+    expected: Any,
+) -> None:
+    """Comparer le seed aux comptages configurés."""
+
+    if len(queries) != expected.total_queries:
+        raise ValueError(
+            f"Nombre de questions incorrect : {len(queries)} "
+            f"!= {expected.total_queries}."
+        )
+
+    answerable_count = sum(
+        query.answerable
+        for query in queries
+    )
+
+    if answerable_count != expected.answerable_queries:
+        raise ValueError(
+            "Nombre de questions répondables incorrect : "
+            f"{answerable_count} != "
+            f"{expected.answerable_queries}."
+        )
+
+    unanswerable_count = (
+        len(queries) - answerable_count
+    )
+
+    if (
+        unanswerable_count
+        != expected.unanswerable_queries
+    ):
+        raise ValueError(
+            "Nombre de questions non répondables incorrect : "
+            f"{unanswerable_count} != "
+            f"{expected.unanswerable_queries}."
+        )
+
+    split_counts = Counter(
+        query.split.value
+        for query in queries
+    )
+
+    if dict(split_counts) != expected.splits:
+        raise ValueError(
+            "Répartition des splits incorrecte : "
+            f"{dict(split_counts)} != {expected.splits}."
+        )
+
+    category_counts = Counter(
+        query.category.value
+        for query in queries
+    )
+
+    if dict(category_counts) != expected.categories:
+        raise ValueError(
+            "Répartition des catégories incorrecte : "
+            f"{dict(category_counts)} != "
+            f"{expected.categories}."
+        )
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Lire les arguments."""
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Créer le benchmark retrieval PhosProcess v0.1."
+        )
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Supprimer et recréer le répertoire de sortie. "
+            "Cette option efface aussi les jugements existants."
+        ),
+    )
+
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Créer le dataset initial."""
+
+    arguments = parse_arguments()
+
+    config = load_evaluation_config(
+        CONFIG_PATH
+    )
+
+    output_directory = resolve_project_path(
+        config.dataset.output_directory
+    )
+
+    if output_directory.exists():
+        if not arguments.force:
+            raise FileExistsError(
+                "Le dataset existe déjà : "
+                f"{output_directory}\n"
+                "Utilise --force uniquement pour le recréer "
+                "et effacer les annotations existantes."
+            )
+
+        shutil.rmtree(output_directory)
+
+    output_directory.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+    queries = build_queries()
+
+    validate_expected_counts(
+        queries,
+        config.expected,
+    )
+
+    query_ids = [
+        query.query_id
+        for query in queries
+    ]
+
+    expected_query_ids = [
+        f"Q{index:03d}"
+        for index in range(
+            1,
+            len(queries) + 1,
+        )
+    ]
+
+    if query_ids != expected_query_ids:
+        raise ValueError(
+            "Les query_id doivent être continus de "
+            "Q001 à Q048."
+        )
+
+    queries_path = (
+        output_directory
+        / config.dataset.queries_filename
+    )
+
+    judgments_path = (
+        output_directory
+        / config.dataset.judgments_filename
+    )
+
+    manifest_path = (
+        output_directory
+        / config.dataset.manifest_filename
+    )
+
+    write_jsonl(
+        queries,
+        queries_path,
+    )
+
+    judgments_path.write_text(
+        "",
+        encoding="utf-8",
+    )
+
+    split_counts = Counter(
+        query.split.value
+        for query in queries
+    )
+
+    category_counts = Counter(
+        query.category.value
+        for query in queries
+    )
+
+    language_counts = Counter(
+        query.language.value
+        for query in queries
+    )
+
+    difficulty_counts = Counter(
+        query.difficulty.value
+        for query in queries
+    )
+
+    manifest: dict[str, Any] = {
+        "dataset": {
+            "name": config.dataset.name,
+            "version": config.dataset.version,
+            "schema_version": (
+                config.dataset.schema_version
+            ),
+            "status": "draft_queries_created",
+        },
+        "created_at_utc": datetime.now(UTC).isoformat(),
+        "pipeline_version": config.pipeline_version,
+        "counts": {
+            "total_queries": len(queries),
+            "answerable": sum(
+                query.answerable
+                for query in queries
+            ),
+            "unanswerable": sum(
+                not query.answerable
+                for query in queries
+            ),
+            "judgments": 0,
+            "splits": dict(split_counts),
+            "categories": dict(category_counts),
+            "languages": dict(language_counts),
+            "difficulties": dict(
+                difficulty_counts
+            ),
+        },
+        "reference_documents": sorted(
+            {
+                document_id
+                for query in queries
+                for document_id
+                in query.reference_documents
+            }
+        ),
+        "files": {
+            "queries": {
+                "filename": queries_path.name,
+                "sha256": sha256_file(queries_path),
+                "size_bytes": queries_path.stat().st_size,
+            },
+            "judgments": {
+                "filename": judgments_path.name,
+                "sha256": sha256_file(
+                    judgments_path
+                ),
+                "size_bytes": (
+                    judgments_path.stat().st_size
+                ),
+            },
+        },
+        "configuration": {
+            "path": str(CONFIG_PATH),
+            "sha256": sha256_file(CONFIG_PATH),
+        },
+    }
+
+    write_json(
+        manifest,
+        manifest_path,
+    )
+
+    print("\n=== Dataset d'évaluation créé ===")
+    print(f"Répertoire    : {output_directory}")
+    print(f"Questions     : {len(queries)}")
+    print(
+        "Répondables   : "
+        f"{manifest['counts']['answerable']}"
+    )
+    print(
+        "Non répondables: "
+        f"{manifest['counts']['unanswerable']}"
+    )
+    print(f"Splits        : {dict(split_counts)}")
+    print(
+        f"Catégories    : {dict(category_counts)}"
+    )
+    print(f"Langues       : {dict(language_counts)}")
+    print(f"Questions     : {queries_path}")
+    print(f"Jugements     : {judgments_path}")
+    print(f"Manifest      : {manifest_path}")
+
+
+if __name__ == "__main__":
+    main()
