@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import Lock
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
@@ -9,6 +10,7 @@ from typing import Any, Protocol, cast
 from fastapi import HTTPException, Request, status
 
 from phosprocess.rag.pipeline import PhosProcessRAG, load_runtime_config
+from phosprocess.rag.schemas import RAGResponse
 
 
 class RAGService(Protocol):
@@ -21,6 +23,15 @@ class RAGService(Protocol):
 
     def warmup(self, *, enabled: bool | None = None) -> object:
         """Warm up the retrieval and generation components."""
+
+    def answer(
+        self,
+        question: str,
+        *,
+        source_mode: str = "automatic",
+        language_mode: str = "auto",
+    ) -> RAGResponse:
+        """Generate a grounded answer for one question."""
 
     def close(self) -> None:
         """Release resources owned by the RAG service."""
@@ -62,7 +73,7 @@ def get_rag_runtime_state(request: Request) -> RAGRuntimeState:
 
 
 def get_rag_service(request: Request) -> RAGService:
-    """Return the ready RAG service for routes such as POST /chat."""
+    """Return the ready RAG service used by chat routes."""
 
     runtime_state = get_rag_runtime_state(request)
 
@@ -73,3 +84,21 @@ def get_rag_service(request: Request) -> RAGService:
         )
 
     return runtime_state.service
+
+
+def get_rag_inference_lock(request: Request) -> Lock:
+    """Return the lock protecting the shared local RAG/GPU service."""
+
+    inference_lock = getattr(
+        request.app.state,
+        "rag_inference_lock",
+        None,
+    )
+
+    if inference_lock is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG inference controller is unavailable.",
+        )
+
+    return cast(Lock, inference_lock)

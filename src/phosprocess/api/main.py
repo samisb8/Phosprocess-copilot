@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from asyncio import Lock
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from phosprocess.api.dependencies import (
     RAGServiceFactory,
     build_rag_service,
 )
+from phosprocess.api.routes.chat import router as chat_router
 from phosprocess.api.routes.health import router as health_router
 from phosprocess.api.routes.readiness import router as readiness_router
 
@@ -42,6 +44,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         service: RAGService | None = None
+        application.state.rag_inference_lock = Lock()
 
         try:
             service = service_factory()
@@ -91,6 +94,7 @@ def create_app(
     )
     application.include_router(health_router)
     application.include_router(readiness_router)
+    application.include_router(chat_router)
 
     return application
 
