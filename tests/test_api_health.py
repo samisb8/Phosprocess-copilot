@@ -5,6 +5,10 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from phosprocess.api.main import create_app
+from tests.support.database import (
+    build_test_database_engine,
+    check_test_database_connection,
+)
 
 
 class _HealthyRAGService:
@@ -33,6 +37,8 @@ def test_health_returns_ok() -> None:
     application = create_app(
         service_factory=lambda: service,
         warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
     )
 
     with TestClient(application) as client:

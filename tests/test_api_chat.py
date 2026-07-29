@@ -12,6 +12,10 @@ from phosprocess.rag.schemas import (
     RAGSource,
     RAGTimings,
 )
+from tests.support.database import (
+    build_test_database_engine,
+    check_test_database_connection,
+)
 
 
 class _FakeChatRAGService:
@@ -112,6 +116,8 @@ def test_chat_returns_public_rag_response() -> None:
     application = create_app(
         service_factory=lambda: service,
         warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
     )
 
     with TestClient(application) as client:
@@ -153,6 +159,8 @@ def test_chat_rejects_an_empty_question() -> None:
     application = create_app(
         service_factory=lambda: service,
         warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
     )
 
     with TestClient(application) as client:
@@ -174,6 +182,8 @@ def test_chat_returns_503_when_rag_is_unavailable() -> None:
     application = create_app(
         service_factory=failing_factory,
         warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
     )
 
     with TestClient(application) as client:
