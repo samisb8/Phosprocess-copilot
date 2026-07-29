@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from phosprocess.database.engine import create_database_engine
 from phosprocess.database.health import DatabaseHealth
+from phosprocess.database.services.chat_history import (
+    ChatHistoryService,
+)
 from phosprocess.database.services.chat_persistence import (
     ChatPersistenceService,
 )
@@ -88,6 +91,16 @@ def get_database_session_factory(
         )
 
     return runtime_state.session_factory
+
+
+def get_chat_history_service(
+    request: Request,
+) -> ChatHistoryService:
+    """Build the read-only chat history service."""
+
+    return ChatHistoryService(
+        get_database_session_factory(request)
+    )
 
 
 def get_chat_persistence_service(

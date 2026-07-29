@@ -6,11 +6,13 @@ import logging
 from asyncio import Lock
 from functools import partial
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
 from phosprocess.api.database_dependencies import (
+    get_chat_history_service,
     get_chat_persistence_service,
 )
 from phosprocess.api.dependencies import (
@@ -19,14 +21,23 @@ from phosprocess.api.dependencies import (
     get_rag_service,
 )
 from phosprocess.api.schemas.chat import (
+    ChatHistoryCitationResponse,
+    ChatHistoryMessageResponse,
     ChatPolicyResponse,
     ChatRequest,
     ChatResponse,
+    ChatSessionHistoryResponse,
     ChatSourceResponse,
     ChatTimingsResponse,
 )
 from phosprocess.database.repositories.chat_repository import (
     ChatSessionNotFoundError,
+)
+from phosprocess.database.services.chat_history import (
+    ChatHistoryCitation,
+    ChatHistoryMessage,
+    ChatHistoryService,
+    ChatSessionHistory,
 )
 from phosprocess.database.services.chat_persistence import (
     ChatPersistenceService,
@@ -59,6 +70,70 @@ def _map_source(source: RAGSource) -> ChatSourceResponse:
         page_end=source.page_end,
         domain=source.domain,
         chunk_type=source.chunk_type,
+    )
+
+
+def _map_history_citation(
+    citation: ChatHistoryCitation,
+) -> ChatHistoryCitationResponse:
+    """Convert one persisted citation to its public contract."""
+
+    return ChatHistoryCitationResponse(
+        id=citation.id,
+        source_number=citation.source_number,
+        chunk_id=citation.chunk_id,
+        document_name=citation.document_name,
+        pages=list(citation.pages),
+        section=citation.section,
+        excerpt=citation.excerpt,
+        document_title=citation.document_title,
+        filename=citation.filename,
+        chapter=citation.chapter,
+        page_start=citation.page_start,
+        page_end=citation.page_end,
+        domain=citation.domain,
+        chunk_type=citation.chunk_type,
+        is_cited=citation.is_cited,
+        created_at=citation.created_at,
+    )
+
+
+def _map_history_message(
+    message: ChatHistoryMessage,
+) -> ChatHistoryMessageResponse:
+    """Convert one persisted message to its public contract."""
+
+    return ChatHistoryMessageResponse(
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
+        insufficient_context=message.insufficient_context,
+        model_name=message.model_name,
+        response_language=message.response_language,
+        question_type=message.question_type,
+        total_ms=message.total_ms,
+        citations=[
+            _map_history_citation(citation)
+            for citation in message.citations
+        ],
+    )
+
+
+def _map_history(
+    history: ChatSessionHistory,
+) -> ChatSessionHistoryResponse:
+    """Convert a complete persisted conversation to the API."""
+
+    return ChatSessionHistoryResponse(
+        session_id=history.session_id,
+        title=history.title,
+        created_at=history.created_at,
+        updated_at=history.updated_at,
+        messages=[
+            _map_history_message(message)
+            for message in history.messages
+        ],
     )
 
 
@@ -104,6 +179,56 @@ def _map_response(
             first_token_ms=response.timings.first_token_ms,
         ),
     )
+
+
+@router.get(
+    "/chat/sessions/{session_id}",
+    response_model=ChatSessionHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The requested chat session does not exist.",
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "The database service is not ready.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "The conversation history could not be loaded.",
+        },
+    },
+    summary="Read a persisted chat conversation",
+)
+async def get_chat_session_history(
+    session_id: UUID,
+    history_service: Annotated[
+        ChatHistoryService,
+        Depends(get_chat_history_service),
+    ],
+) -> ChatSessionHistoryResponse:
+    """Return one complete persisted conversation."""
+
+    try:
+        operation = partial(
+            history_service.get_session_history,
+            session_id,
+        )
+        history = await run_in_threadpool(operation)
+    except ChatSessionNotFoundError as exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exception),
+        ) from exception
+    except Exception as exception:
+        LOGGER.exception(
+            "The chat session history could not be loaded."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The chat session history could not be loaded.",
+        ) from exception
+
+    return _map_history(history)
 
 
 @router.post(

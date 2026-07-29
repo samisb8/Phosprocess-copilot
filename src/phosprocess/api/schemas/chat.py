@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -70,6 +71,62 @@ class ChatSourceResponse(BaseModel):
     page_end: int | None = None
     domain: str | None = None
     chunk_type: str | None = None
+
+
+class ChatHistoryCitationResponse(BaseModel):
+    """Citation persisted with one historical assistant message."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    source_number: int = Field(gt=0)
+    chunk_id: str
+    document_name: str
+    pages: list[int] = Field(default_factory=list)
+    section: str | None = None
+    excerpt: str
+    document_title: str | None = None
+    filename: str | None = None
+    chapter: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    domain: str | None = None
+    chunk_type: str | None = None
+    is_cited: bool
+    created_at: datetime
+
+
+class ChatHistoryMessageResponse(BaseModel):
+    """One persisted user or assistant message."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    role: str
+    content: str
+    created_at: datetime
+    insufficient_context: bool | None = None
+    model_name: str | None = None
+    response_language: str | None = None
+    question_type: str | None = None
+    total_ms: float | None = Field(default=None, ge=0)
+    citations: list[ChatHistoryCitationResponse] = Field(
+        default_factory=list
+    )
+
+
+class ChatSessionHistoryResponse(BaseModel):
+    """Complete persisted conversation returned by the history API."""
+
+    model_config = ConfigDict(frozen=True)
+
+    session_id: UUID
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    messages: list[ChatHistoryMessageResponse] = Field(
+        default_factory=list
+    )
 
 
 class ChatTimingsResponse(BaseModel):
