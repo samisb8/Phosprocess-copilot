@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
 from phosprocess.database.models import (
     ChatMessage,
@@ -51,6 +52,33 @@ class ChatRepository:
         chat_session = self._database_session.get(
             ChatSession,
             session_id,
+        )
+
+        if chat_session is None:
+            raise ChatSessionNotFoundError(session_id)
+
+        return chat_session
+
+    def require_session_with_history(
+        self,
+        session_id: UUID,
+    ) -> ChatSession:
+        """Load one conversation with all messages and citations."""
+
+        statement = (
+            select(ChatSession)
+            .options(
+                selectinload(
+                    ChatSession.messages
+                ).selectinload(
+                    ChatMessage.citations
+                )
+            )
+            .where(ChatSession.id == session_id)
+        )
+
+        chat_session = self._database_session.scalar(
+            statement
         )
 
         if chat_session is None:
