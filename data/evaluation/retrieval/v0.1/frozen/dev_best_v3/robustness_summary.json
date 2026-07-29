@@ -1,0 +1,295 @@
+{
+  "audit": {
+    "checks": {
+      "generic_policy": true,
+      "inference_signature_is_generic": true,
+      "no_chunk_id_literal": true,
+      "no_gold_or_reference_answer_term": true,
+      "no_query_id_literal": true,
+      "only_retrieval_rank_signals_used": true
+    },
+    "forbidden_terms_found": [],
+    "function_parameters": [
+      "candidates",
+      "reranked_results",
+      "top_k",
+      "lexical_slots"
+    ],
+    "hardcoded_chunk_ids": [],
+    "hardcoded_query_ids": [],
+    "inference_boundary": {
+      "evaluation_only": "Les gold DEV sont consultés après sélection uniquement pour calculer les métriques.",
+      "question_usage": "La question est utilisée uniquement par le retriever et le reranker en amont.",
+      "safeguard_inputs": "Candidats hybrides, rangs BM25/hybrides et ordre du reranker."
+    },
+    "passed": true,
+    "retrieval_signal_attributes": [
+      "append",
+      "bm25_rank",
+      "chunk",
+      "chunk_id",
+      "join",
+      "rank"
+    ],
+    "unexpected_signal_attributes": []
+  },
+  "baseline_v2_metrics": {
+    "candidate_recall_at_20": 1.0,
+    "evidence_recall_at_5": 0.9375,
+    "hit_at_1": 0.6875,
+    "hit_at_5": 0.9375,
+    "mrr_at_5": 0.7760416666666666
+  },
+  "determinism": {
+    "all_variant_selections_stable": true,
+    "baseline_same_top5": true,
+    "current_same_metrics": true,
+    "current_same_top5": true,
+    "repetitions": 3,
+    "stable_current_queries": 16,
+    "total_current_queries": 16
+  },
+  "gold_usage": "post_selection_metrics_only",
+  "gold_used_for_inference": false,
+  "outputs": {
+    "parameter_sensitivity": "data/evaluation/retrieval/v0.1/v3/robustness/parameter_sensitivity.csv",
+    "per_query": "data/evaluation/retrieval/v0.1/v3/robustness/robustness_per_query.csv",
+    "report": "data/evaluation/retrieval/v0.1/v3/robustness/robustness_report.md",
+    "summary": "data/evaluation/retrieval/v0.1/v3/robustness/robustness_summary.json"
+  },
+  "per_question_differences": {
+    "lexical_safeguard_001": [
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q003",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 4,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q006",
+        "variant_gold_rank": 4
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q008",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q009",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q010",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 3,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q011",
+        "variant_gold_rank": 3
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q012",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": "",
+        "outcome": "improved",
+        "query_id": "Q015",
+        "variant_gold_rank": 5
+      }
+    ],
+    "permissive_lexical_slots_2": [
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q002",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q003",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q004",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q005",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 4,
+        "outcome": "regressed",
+        "query_id": "Q006",
+        "variant_gold_rank": ""
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q008",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q009",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q010",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 3,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q011",
+        "variant_gold_rank": 3
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q012",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q013",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q014",
+        "variant_gold_rank": 1
+      },
+      {
+        "baseline_gold_rank": "",
+        "outcome": "improved",
+        "query_id": "Q015",
+        "variant_gold_rank": 4
+      },
+      {
+        "baseline_gold_rank": 1,
+        "outcome": "selection_changed_metric_equal",
+        "query_id": "Q016",
+        "variant_gold_rank": 1
+      }
+    ],
+    "strict_lexical_slots_0": []
+  },
+  "recommendation": "freeze lexical_safeguard_001",
+  "reference_answers_used_for_inference": false,
+  "repetitions": 3,
+  "robustness_passed": true,
+  "selected_variant": "lexical_safeguard_001",
+  "selection_rule": [
+    "no_candidate_recall_at_20_regression",
+    "maximize_evidence_recall_at_5",
+    "maximize_hit_at_5",
+    "maximize_mrr_at_5",
+    "maximize_hit_at_1",
+    "minimize_complexity",
+    "minimize_policy_latency"
+  ],
+  "source_sha256": {
+    "embeddings.yaml": "F1636BEB89F46D3E7EC9E7F575871F0FF9AB52735976D83CFC76BF0F44E6881E",
+    "gold_evidence.jsonl": "B926B2E6B226791AF9223E945D631CB70AC58CBC5988739D178978F92F7E773B",
+    "hybrid.py": "074371D34A9529542F387DD0795E9FE2795229EE1AB82D7B585CC3F03168741B",
+    "queries.jsonl": "FA5EE9A1CFBC457E3008288ACD4E79D779697E39746A9CE97BEAB0EAD8DA5F35",
+    "reranker.py": "100A060F074FA2CE32AC0CA7ACBA589B5C52709A8E11DA71EBE70EC25E400737",
+    "reranking.yaml": "3A8DA7F3BFFD9592CFCC7A1139AE738B0FC919B49EAD3B652C5E81EEA761C0B0",
+    "retrieval_v2.yaml": "04DE6EF85B34C0E7D61AA9904392874DB136F2C7FFD62DC2129F0C59EFC37C12",
+    "v3_selection.py": "E3F31A45887907E599DE0CF36020D125F9B1B04DA4A719134371F4B503783958",
+    "validate_retrieval_dev_v3_robustness.py": "1444FC244B843D1ADF7AEAC485D666E5359E49ACE7D114E561BF55E60D0F4ECC"
+  },
+  "split": "dev",
+  "status": "completed_dev_only",
+  "test_artifacts_read": false,
+  "test_evaluation_run": false,
+  "v3_frozen": false,
+  "validation_id": "v3_lexical_safeguard_robustness_001",
+  "variants": [
+    {
+      "candidate_recall_at_20": 1.0,
+      "complexity": 0,
+      "delta_candidate_recall_at_20": 0.0,
+      "delta_evidence_recall_at_5": 0.0,
+      "delta_hit_at_1": 0.0,
+      "delta_hit_at_5": 0.0,
+      "delta_mrr_at_5": 0.0,
+      "eligible_candidate_recall": true,
+      "evidence_recall_at_5": 0.9375,
+      "hit_at_1": 0.6875,
+      "hit_at_5": 0.9375,
+      "label": "plus_stricte",
+      "lexical_slots": 0,
+      "median_policy_latency_us": 51.349999999999994,
+      "metrics_identical_across_runs": true,
+      "mrr_at_5": 0.7760416666666666,
+      "selected": false,
+      "selection_rank": 2,
+      "variant_id": "strict_lexical_slots_0"
+    },
+    {
+      "candidate_recall_at_20": 1.0,
+      "complexity": 1,
+      "delta_candidate_recall_at_20": 0.0,
+      "delta_evidence_recall_at_5": 0.0625,
+      "delta_hit_at_1": 0.0,
+      "delta_hit_at_5": 0.0625,
+      "delta_mrr_at_5": 0.012500000000000067,
+      "eligible_candidate_recall": true,
+      "evidence_recall_at_5": 1.0,
+      "hit_at_1": 0.6875,
+      "hit_at_5": 1.0,
+      "label": "actuelle",
+      "lexical_slots": 1,
+      "median_policy_latency_us": 35.099999999999994,
+      "metrics_identical_across_runs": true,
+      "mrr_at_5": 0.7885416666666667,
+      "selected": true,
+      "selection_rank": 1,
+      "variant_id": "lexical_safeguard_001"
+    },
+    {
+      "candidate_recall_at_20": 1.0,
+      "complexity": 2,
+      "delta_candidate_recall_at_20": 0.0,
+      "delta_evidence_recall_at_5": 0.0,
+      "delta_hit_at_1": 0.0,
+      "delta_hit_at_5": 0.0,
+      "delta_mrr_at_5": 0.0,
+      "eligible_candidate_recall": true,
+      "evidence_recall_at_5": 0.9375,
+      "hit_at_1": 0.6875,
+      "hit_at_5": 0.9375,
+      "label": "plus_permissive",
+      "lexical_slots": 2,
+      "median_policy_latency_us": 31.900000000000002,
+      "metrics_identical_across_runs": true,
+      "mrr_at_5": 0.7760416666666666,
+      "selected": false,
+      "selection_rank": 3,
+      "variant_id": "permissive_lexical_slots_2"
+    }
+  ]
+}

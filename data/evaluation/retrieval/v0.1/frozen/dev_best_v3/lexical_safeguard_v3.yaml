@@ -1,0 +1,28 @@
+experiment_id: lexical_safeguard_001
+pipeline_version: "0.3.0"
+development_split: dev
+
+retrieval:
+  candidate_k: 20
+  dense_candidates: 20
+  bm25_candidates: 20
+  query_expansion: true
+
+selection:
+  method: lexical_safeguard
+  top_k: 5
+  lexical_slots: 1
+  reranker_leading_slots: 4
+  lexical_source: bm25
+  lexical_order:
+    - bm25_rank_ascending
+    - hybrid_rank_ascending
+    - chunk_id_ascending
+  duplicate_policy: skip
+  fallback: next_reranker_result
+
+provenance:
+  decision_source: data/evaluation/retrieval/v0.1/v3/robustness
+  development_only: true
+  reference_answers_used_for_inference: false
+  gold_used_for_inference: false

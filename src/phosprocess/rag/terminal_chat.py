@@ -303,7 +303,14 @@ def handle_command(
             return True
 
         state.last_sources.clear()
-        state.memory.state.current_document_scope = state.source_mode
+        if state.source_mode == "auto":
+            state.memory.state.release_source_scope()
+        else:
+            state.memory.state.record_source_scope(
+                state.source_mode,
+                explicit=True,
+                origin="terminal_command",
+            )
         print(
             f"Politique documentaire active : {state.source_mode}.",
             file=output,
@@ -412,9 +419,10 @@ class TerminalChat:
     def _answer(self, question: str) -> None:
         """Display one real token stream and retain only validated responses."""
 
+        history_context = self.state.memory.build_history_context()
         events = self.service.stream_answer(
             question,
-            self.state.memory.build_history_context(),
+            history_context,
             source_mode=self.state.source_mode,
             language_mode=self.state.language_mode,
         )
@@ -604,6 +612,11 @@ class TerminalChat:
                 file=self.output,
             )
             return
+
+        if history_context.business_state is not None:
+            self.state.memory.synchronize_business_state(
+                history_context.business_state
+            )
 
         if completed_answer is not None:
             self.state.memory.add_turn(question, completed_answer)

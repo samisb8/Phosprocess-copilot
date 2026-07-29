@@ -25,8 +25,12 @@ from phosprocess.rag.schemas import GroundedAnswerPayload
 from phosprocess.rag.source_policy import (
     ATELIER_SOURCE,
     BECKER_SOURCE,
-    JACOBS_SOURCE,
-    UNIDO_SOURCE,
+    CONTROL_SOURCE,
+    CRYSTALLIZATION_SOURCE,
+    HEAT_TRANSFER_SOURCE,
+    PERRY_SOURCE,
+    THERMODYNAMICS_SOURCE,
+    TRANSPORT_SOURCE,
     SourcePolicyConfig,
     decide_source_policy,
     detect_explicit_active_source,
@@ -37,22 +41,55 @@ from phosprocess.retrieval.hybrid import HybridSearchResult
 
 ALL_SOURCES = (
     BECKER_SOURCE,
-    UNIDO_SOURCE,
-    JACOBS_SOURCE,
+    THERMODYNAMICS_SOURCE,
+    HEAT_TRANSFER_SOURCE,
     ATELIER_SOURCE,
+    PERRY_SOURCE,
+    CRYSTALLIZATION_SOURCE,
+    CONTROL_SOURCE,
+    TRANSPORT_SOURCE,
 )
 
 
 def make_policy_config() -> SourcePolicyConfig:
-    """Return the exact production policy used by the YAML file."""
+    """Return the exact eight-document rollback policy from YAML."""
 
     return SourcePolicyConfig(
         enabled=True,
         default_priority=ALL_SOURCES,
         domain_routes={
-            "general": (BECKER_SOURCE,),
-            "jacobs": (JACOBS_SOURCE, BECKER_SOURCE),
-            "ocp_atelier": (ATELIER_SOURCE, BECKER_SOURCE),
+            "general": (PERRY_SOURCE, BECKER_SOURCE),
+            "phosphoric_acid": (
+                BECKER_SOURCE,
+                ATELIER_SOURCE,
+                PERRY_SOURCE,
+            ),
+            "plant_specific": (
+                ATELIER_SOURCE,
+                BECKER_SOURCE,
+                PERRY_SOURCE,
+            ),
+            "thermodynamics": (
+                THERMODYNAMICS_SOURCE,
+                PERRY_SOURCE,
+                ATELIER_SOURCE,
+            ),
+            "heat_transfer": (
+                HEAT_TRANSFER_SOURCE,
+                PERRY_SOURCE,
+                ATELIER_SOURCE,
+            ),
+            "equipment": (
+                PERRY_SOURCE,
+                BECKER_SOURCE,
+                ATELIER_SOURCE,
+            ),
+            "crystallization": (
+                CRYSTALLIZATION_SOURCE,
+                BECKER_SOURCE,
+            ),
+            "control": (CONTROL_SOURCE, ATELIER_SOURCE),
+            "transport": (TRANSPORT_SOURCE, PERRY_SOURCE),
         },
         minimum_preferred_chunks=2,
         allow_fallback=True,
@@ -63,18 +100,18 @@ def make_policy_config() -> SourcePolicyConfig:
     ("question", "route", "primary_source"),
     [
         (
-            "Comment améliorer la filtration du gypse ?",
-            "general",
+            "Comment améliorer la filtration de l'acide phosphorique ?",
+            "phosphoric_acid",
             BECKER_SOURCE,
         ),
         (
-            "Quel est le rôle de la recirculation Jacobs ?",
-            "jacobs",
-            JACOBS_SOURCE,
+            "Quelle relation relie l'enthalpie et la pression de vapeur ?",
+            "thermodynamics",
+            THERMODYNAMICS_SOURCE,
         ),
         (
-            "Comment fonctionne l'atelier OCP ?",
-            "ocp_atelier",
+            "Comment fonctionne l'atelier OCP JFC4 ?",
+            "plant_specific",
             ATELIER_SOURCE,
         ),
     ],
@@ -320,18 +357,18 @@ def make_service(
     ("question", "route", "source_file"),
     [
         (
-            "Pourquoi la concentration améliore-t-elle le procédé ?",
-            "general",
+            "Pourquoi concentrer l'acide phosphorique ?",
+            "phosphoric_acid",
             BECKER_SOURCE,
         ),
         (
-            "Comment est organisé le réacteur Jacobs ?",
-            "jacobs",
-            JACOBS_SOURCE,
+            "Comment fonctionne un échangeur thermique ?",
+            "heat_transfer",
+            HEAT_TRANSFER_SOURCE,
         ),
         (
-            "Quels équipements utilise l'atelier OCP ?",
-            "ocp_atelier",
+            "Quels équipements utilise l'atelier OCP JFC4 ?",
+            "plant_specific",
             ATELIER_SOURCE,
         ),
     ],
@@ -360,36 +397,29 @@ def test_sufficient_preferred_document_supplies_five_cited_chunks(
     assert retriever.calls[0][1]["document_ids"] == set(scope)
 
 
-def test_general_route_falls_back_when_becker_is_insufficient() -> None:
-    becker_scope = frozenset(
-        {document_id_from_source(BECKER_SOURCE)}
-    )
+def test_phosphoric_route_falls_back_when_becker_is_insufficient() -> None:
     default_scope = frozenset(
         document_id_from_source(source)
         for source in ALL_SOURCES
     )
     service, retriever = make_service(
         {
-            becker_scope: make_candidates(
-                BECKER_SOURCE,
-                strong_count=1,
-            ),
-            default_scope: make_candidates(UNIDO_SOURCE),
+            default_scope: make_candidates(PERRY_SOURCE),
         }
     )
 
     response = service.answer(
-        "Pourquoi la filtration est-elle importante ?"
+        "Pourquoi la filtration de l'acide phosphorique est-elle importante ?"
     )
 
-    assert response.source_policy_route == "general"
+    assert response.source_policy_route == "phosphoric_acid"
     assert response.source_policy_fallback_used is True
-    assert len(retriever.calls) == 2
+    assert len(retriever.calls) == 3
     assert service.llm.call_count == 1
     assert {
         source.document_name
         for source in response.sources
-    } == {UNIDO_SOURCE}
+    } == {PERRY_SOURCE}
 
 
 def test_forced_becker_excludes_every_other_document() -> None:

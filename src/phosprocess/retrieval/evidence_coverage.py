@@ -28,6 +28,30 @@ def required_evidence_keys(question_type: str) -> tuple[str, ...]:
     return _REQUIREMENTS.get(question_type, ())
 
 
+def provenance_with_evidence_roles(
+    source: str,
+    roles: Sequence[str],
+) -> str:
+    """Attach ordered evidence roles without discarding selection provenance."""
+
+    role_set = {role.strip() for role in roles if role.strip()}
+    if not role_set:
+        return source
+
+    process_order = _REQUIREMENTS["process_flow"]
+    ordered_roles = [role for role in process_order if role in role_set]
+    ordered_roles.extend(sorted(role_set - set(ordered_roles)))
+
+    provenance_parts = [
+        part.strip()
+        for part in source.split(";")
+        if part.strip()
+        and not part.strip().startswith(("evidence_role:", "evidence_roles:"))
+    ]
+    provenance_parts.append("evidence_roles:" + ",".join(ordered_roles))
+    return ";".join(provenance_parts)
+
+
 _LOW_VALUE = re.compile(
     r"\b(?:table of contents|contents|list of figures|liste des figures|"
     r"list of abbreviations|liste des abr[eé]viations|bibliography|"
@@ -648,17 +672,27 @@ def select_coverage_aware_evidence(
         reranked = reranked_by_id[chunk_id]
         candidate = candidate_by_id[chunk_id]
         original = initial_by_id.get(chunk_id)
+        evidence_roles = coverage_keys_for_text(
+            coverage_text(chunk_id),
+            question_type,
+        )
+        base_source = original.source if original is not None else source
+        annotated_source = provenance_with_evidence_roles(
+            base_source,
+            evidence_roles,
+        )
 
         if original is not None:
             item = replace(
                 original,
                 rank=len(selected) + 1,
+                source=annotated_source,
             )
         else:
             item = V3SelectedResult(
                 rank=len(selected) + 1,
                 chunk_id=chunk_id,
-                source=source,
+                source=annotated_source,
                 reranker_rank=reranked.rank,
                 hybrid_rank=candidate.rank,
                 bm25_rank=candidate.bm25_rank,
@@ -666,13 +700,7 @@ def select_coverage_aware_evidence(
 
         selected.append(item)
         selected_ids.add(chunk_id)
-
-        covered.update(
-            coverage_keys_for_text(
-                coverage_text(chunk_id),
-                question_type,
-            )
-        )
+        covered.update(evidence_roles)
 
     while required - covered and len(selected) < top_k:
         best: Any | None = None

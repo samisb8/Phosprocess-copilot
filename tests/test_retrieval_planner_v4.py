@@ -115,3 +115,111 @@ def test_process_flow_plan_queries_conical_bottom_explicitly() -> None:
         role for role in plan.roles if role.name == "conical_bottom"
     )
     assert "conical bottom" in conical.query
+
+
+def test_pump_necessity_has_independent_functional_roles() -> None:
+    question = "Pourquoi la pompe de circulation est-elle nécessaire ?"
+    plan = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="explanation",
+    )
+
+    assert plan.answer_intent == "pump_necessity"
+    assert {role.name for role in plan.roles} == {
+        "pump_circulation",
+        "pump_heating_path",
+        "pump_process_function",
+    }
+
+
+def test_definition_plan_requires_nature_mechanism_and_function() -> None:
+    question = (
+        "C'est quoi un évaporateur à circulation forcée en wet process ?"
+    )
+    plan = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="definition",
+    )
+
+    assert {role.name for role in plan.roles} == {
+        "definition_nature",
+        "definition_mechanism",
+        "definition_function",
+    }
+
+
+def test_jfc4_p2o5_balance_uses_plant_specific_roles() -> None:
+    question = "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP."
+    plan = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="balance",
+    )
+
+    assert plan.balance_kind == "p2o5_plant"
+    assert {role.name for role in plan.roles} == {
+        "p2o5_conservation",
+        "p2o5_feed",
+        "p2o5_product",
+        "p2o5_entrainment",
+    }
+
+
+def test_momentum_diffusion_plan_excludes_mass_diffusion_roles() -> None:
+    question = "Explain momentum diffusion in a fluid according to Bird."
+    plan = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="momentum_diffusion",
+    )
+
+    assert plan.answer_intent == "momentum_diffusion"
+    assert {role.name for role in plan.roles} == {
+        "momentum_transport",
+        "velocity_gradient",
+        "newton_viscosity_law",
+    }
+    assert all("concentration" not in role.query.casefold() for role in plan.roles)
+
+
+def test_pump_role_keeps_withdrawal_as_optional_becker_detail() -> None:
+    question = "Quel est le rôle de la pompe de circulation ?"
+    plan = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="explanation",
+    )
+
+    roles = {role.name: role for role in plan.roles}
+    assert plan.answer_intent == "pump_role"
+    assert roles["pump_withdrawal"].required is False
+    assert roles["pump_heating_path"].required is True
+    assert roles["pump_process_function"].required is False
+
+
+def test_definition_and_p2o5_composite_roles_only_require_atomic_evidence() -> None:
+    definition = build_retrieval_plan(
+        "C'est quoi un évaporateur à circulation forcée ?",
+        standalone_query="C'est quoi un évaporateur à circulation forcée ?",
+        question_type="definition",
+    )
+    definition_roles = {role.name: role for role in definition.roles}
+    assert definition_roles["definition_nature"].required is False
+    assert definition_roles["definition_mechanism"].required is True
+    assert definition_roles["definition_function"].required is True
+
+    question = (
+        "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP."
+    )
+    balance = build_retrieval_plan(
+        question,
+        standalone_query=question,
+        question_type="balance",
+    )
+    balance_roles = {role.name: role for role in balance.roles}
+    assert balance_roles["p2o5_conservation"].required is False
+    assert balance_roles["p2o5_feed"].required is True
+    assert balance_roles["p2o5_product"].required is True
+    assert balance_roles["p2o5_entrainment"].required is True

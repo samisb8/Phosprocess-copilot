@@ -36,6 +36,22 @@ data/raw/private/*
 data/interim/*
 data/processed/*
 data/indexes/*
+data/knowledge_base/pdfs/*
+data/knowledge_base/archive/*
+data/knowledge_base/rejected/*
+data/knowledge_base/processed/*
+data/knowledge_base/parsed/*
+data/knowledge_base/corpus/*
+data/knowledge_base/indexes/*
+data/knowledge_base/manifest.sqlite*
+data/knowledge_base/current_index.json
+!data/knowledge_base/pdfs/.gitkeep
+!data/knowledge_base/archive/.gitkeep
+!data/knowledge_base/rejected/.gitkeep
+!data/knowledge_base/processed/.gitkeep
+!data/knowledge_base/parsed/.gitkeep
+!data/knowledge_base/corpus/.gitkeep
+!data/knowledge_base/indexes/.gitkeep
 
 # Models and large files
 models/adapters/*
@@ -57,3 +73,37 @@ dist/
 # Windows
 Thumbs.db
 desktop.ini
+
+# Local audit and patch artifacts
+.audit/
+patch_backups/
+/PATCH_*.md
+/apply_patch*.py
+/audit_fix_patch*.py
+/fix_patch*.py
+/*.patch
+/*.zip
+/install_hierarchical_retrieval_v2.ps1
+
+# Runtime observability
+data/observability/
+
+# Local source documents
+data/raw/public/*.pdf
+data/raw/public/*.PDF
+
+# Temporary evaluation working files
+data/evaluation/**/annotation_pool*.jsonl
+data/evaluation/**/annotation_pool_summary.json
+data/evaluation/**/annotation_progress.json
+data/evaluation/**/*.checkpoint.jsonl
+data/evaluation/**/*backup*.jsonl
+data/evaluation/**/*before_*.jsonl
+data/evaluation/**/*draft*.jsonl
+data/evaluation/**/manual_review_queue.jsonl
+
+# Reproducible detailed outputs
+data/evaluation/**/results/*_per_query.csv
+data/evaluation/**/v3/experiments/
+data/evaluation/**/v3/analysis/
+data/evaluation/**/v3/robustness/*_per_query.csv

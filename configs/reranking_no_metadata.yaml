@@ -1,0 +1,15 @@
+model:
+  name: BAAI/bge-reranker-v2-m3
+  device: auto
+  use_fp16: true
+  normalize_scores: true
+inference:
+  batch_size: 2
+  max_length: 1024
+retrieval:
+  hybrid_candidate_k: 15
+  final_top_k: 5
+passage:
+  include_source_file: false
+  include_heading_path: false
+pipeline_version: 0.1.0

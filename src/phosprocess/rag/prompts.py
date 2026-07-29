@@ -217,6 +217,11 @@ def build_quality_prompt_package(
                 "same evidence bundle."
             ),
             "Distinguish general information from plant-specific information.",
+            (
+                "When sources describe different designs, operating periods or "
+                "values, attribute each context explicitly and never merge them "
+                "into one fact."
+            ),
             "Preserve equations, units, symbols, formulas and document titles.",
             "Do not expose hidden reasoning.",
             (
@@ -308,6 +313,51 @@ def build_quality_prompt_package(
                 (
                     "Do not replace the definition with only an advantage, "
                     "application or design consequence."
+                ),
+            ]
+        )
+
+    if classification.question_type.value == "momentum_diffusion":
+        formatting.extend(
+            [
+                (
+                    "Explain momentum diffusion only through momentum flux, "
+                    "velocity gradient, shear stress and dynamic viscosity."
+                ),
+                (
+                    "For a Newtonian fluid, state Newton's law of viscosity "
+                    "when it is supported by the evidence and define every symbol."
+                ),
+                (
+                    "Do not use Fick's law, concentration gradients or species "
+                    "diffusivity unless the question explicitly asks for a contrast."
+                ),
+            ]
+        )
+
+    normalized_question = question.casefold().replace("₂", "2").replace("₅", "5")
+    plant_p2o5_balance = (
+        classification.question_type.value == "balance"
+        and "p2o5" in normalized_question
+        and any(
+            marker in normalized_question
+            for marker in ("jfc4", "échelon", "echelon", "rapport ocp")
+        )
+    )
+    if plant_p2o5_balance:
+        formatting.extend(
+            [
+                (
+                    "Use the report's three P2O5 terms: feed at line 1, "
+                    "concentrated product at line 5, and entrainment at line 6."
+                ),
+                (
+                    "Do not set the entrainment loss to zero when the report "
+                    "provides a non-zero value."
+                ),
+                (
+                    "Keep report values and units distinct from generic textbook "
+                    "equations or design assumptions."
                 ),
             ]
         )

@@ -1,0 +1,62 @@
+{
+  "dataset": {
+    "name": "phosprocess_retrieval",
+    "version": "0.1",
+    "schema_version": "1.0",
+    "status": "draft_queries_created"
+  },
+  "created_at_utc": "2026-07-25T13:54:50.835882+00:00",
+  "pipeline_version": "0.1.0",
+  "counts": {
+    "total_queries": 48,
+    "answerable": 40,
+    "unanswerable": 8,
+    "judgments": 0,
+    "splits": {
+      "dev": 20,
+      "test": 28
+    },
+    "categories": {
+      "exact_numeric": 8,
+      "causal_mechanism": 8,
+      "process_description": 6,
+      "operator_diagnosis": 6,
+      "process_comparison": 4,
+      "table_data": 4,
+      "impurities_losses_corrosion": 4,
+      "unanswerable": 8
+    },
+    "languages": {
+      "fr": 34,
+      "en": 10,
+      "mixed": 4
+    },
+    "difficulties": {
+      "medium": 20,
+      "hard": 19,
+      "easy": 9
+    }
+  },
+  "reference_documents": [
+    "01_becker_phosphates_and_phosphoric_acid",
+    "02_jacobs_largest_phosphoric_acid_plant",
+    "03_unido_phosphate_process_technologies",
+    "04_rapport_atelier_acide_phosphorique"
+  ],
+  "files": {
+    "queries": {
+      "filename": "queries.jsonl",
+      "sha256": "fa5ee9a1cfbc457e3008288acd4e79d779697e39746a9ce97beab0ead8da5f35",
+      "size_bytes": 25004
+    },
+    "judgments": {
+      "filename": "judgments.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    }
+  },
+  "configuration": {
+    "path": "C:\\Users\\USER\\Desktop\\phosprocess-copilot\\configs\\evaluation.yaml",
+    "sha256": "fb4fdc95e76750abd288cf7c90de9ecbafeb36130752d497f0d8ccacc0604222"
+  }
+}

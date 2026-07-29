@@ -158,8 +158,14 @@ def test_quality_retrieval_returns_five_bounded_bundles(
     technical: list[TechnicalChildChunk] = []
     runtime: list[DocumentChunk] = []
 
+    definition_passages = (
+        "A forced-circulation evaporator is a type of evaporator equipment.",
+        "A pump circulates the liquid through the heating surface.",
+        "The arrangement separates heat transfer from vapor liquid separation.",
+    )
+
     for index in range(20):
-        text = f"Evaporator definition and heat transfer passage {index}."
+        text = f"{definition_passages[index % 3]} Passage {index}."
         technical.append(
             TechnicalChildChunk(
                 chunk_id=f"chunk_{index:02d}",
@@ -449,3 +455,43 @@ def test_process_scope_removes_refrigeration_passage() -> None:
 
     assert [item.chunk.chunk_id for item in filtered.results] == ["process"]
     assert filtered.results[0].rank == 1
+
+
+def test_report_section_affinity_breaks_close_reranker_tie() -> None:
+    matched = _chunk("matched", "ocp_phosphoric_acid_workshop_report").model_copy(
+        update={"section": "Bilan thermique de l'échelon J"}
+    )
+    unrelated = _chunk("unrelated", "ocp_phosphoric_acid_workshop_report").model_copy(
+        update={"section": "Présentation de l'entreprise"}
+    )
+    response = RerankingResponse(
+        query="bilan thermique echelon J",
+        model_name="model",
+        device="cpu",
+        candidates_received=2,
+        top_k_requested=2,
+        reranking_duration_ms=1.0,
+        results=[
+            _result(1, 0.51, unrelated),
+            _result(2, 0.50, matched),
+        ],
+    )
+    routing = DomainRoutingDecision(
+        detected_domains=(),
+        confidence=0.9,
+        preferred_documents=("ocp_phosphoric_acid_workshop_report",),
+        soft_boosts={},
+        explanation="test",
+        hard_filter=None,
+        source_mode="auto",
+        question_type="balance",
+        section_affinity_terms=("bilan thermique",),
+    )
+
+    adjusted, _boosts = QualityRetrievalEngine._adjust_reranking(
+        response,
+        routing=routing,
+        question_type="balance",
+    )
+
+    assert adjusted.results[0].chunk.chunk_id == "matched"

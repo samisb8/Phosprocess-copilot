@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -20,6 +21,7 @@ class QuestionType(StrEnum):
     EQUATION_EXPLANATION = "equation_explanation"
     TABLE_QUESTION = "table_question"
     CALCULATION = "calculation"
+    MOMENTUM_DIFFUSION = "momentum_diffusion"
     TROUBLESHOOTING = "troubleshooting"
     CONTROL_STRATEGY = "control_strategy"
     SAFETY = "safety"
@@ -66,6 +68,11 @@ ANSWER_POLICIES: dict[QuestionType, AnswerPolicy] = {
         show_assumptions=True,
         preserve_units=True,
     ),
+    QuestionType.MOMENTUM_DIFFUSION: AnswerPolicy(
+        260,
+        define_variables=True,
+        preserve_units=True,
+    ),
     QuestionType.TROUBLESHOOTING: AnswerPolicy(
         300,
         organize_as_causes_effects_actions=True,
@@ -87,15 +94,29 @@ class QuestionClassification:
     answer_policy: AnswerPolicy
 
 
-def classify_question(question: str) -> QuestionClassification:
-    """Classify in priority order without an LLM call."""
+def _normalize_question(question: str) -> str:
+    """Normalize accents, apostrophes and informal spacing for rules."""
 
-    normalized = (
+    value = (
         question.strip()
         .casefold()
         .replace("’", "'")
         .replace("‘", "'")
     )
+    decomposed = unicodedata.normalize("NFKD", value)
+    without_marks = "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character)
+    )
+    without_apostrophes = re.sub(r"['’‘-]+", " ", without_marks)
+    return re.sub(r"\s+", " ", without_apostrophes).strip()
+
+
+def classify_question(question: str) -> QuestionClassification:
+    """Classify in priority order without an LLM call."""
+
+    normalized = _normalize_question(question)
 
     if not normalized:
         raise ValueError("La question ne peut pas être vide.")
@@ -103,32 +124,47 @@ def classify_question(question: str) -> QuestionClassification:
     rules: tuple[tuple[QuestionType, re.Pattern[str], str], ...] = (
         (
             QuestionType.AMBIGUOUS,
-            re.compile(r"^(?:what is|qu'est-ce que|c'est quoi)\s+(?:the |le |la )?boiler\??$"),
+            re.compile(
+                r"^(?:what is|qu est ce que|c est quoi|cest quoi)\s+"
+                r"(?:the |le |la )?boiler\??$"
+            ),
             "ambiguous_boiler",
         ),
         (
             QuestionType.CALCULATION,
-            re.compile(r"\b(?:calculate|compute|calcule|détermine numériquement)\b"),
+            re.compile(r"\b(?:calculate|compute|calcule|determine numeriquement)\b"),
             "calculation_verb",
         ),
         (
             QuestionType.TROUBLESHOOTING,
-            re.compile(r"\b(?:fouling|encrassement|fault|panne|symptom|cause|remedy|remédier)\b"),
+            re.compile(
+                r"\b(?:fouling|encrassement|fault|panne|symptom|cause|"
+                r"remedy|remedier|bouchage|lavage|shutdown|arret)\b"
+            ),
             "problem_or_remedy",
         ),
         (
             QuestionType.SAFETY,
-            re.compile(r"\b(?:safety|sécurité|hazard|danger|risk|risque)\b"),
+            re.compile(r"\b(?:safety|securite|hazard|danger|risk|risque)\b"),
             "safety_term",
         ),
         (
             QuestionType.CONTROL_STRATEGY,
             re.compile(
                 r"\b(?:pid|mpc|controller|control(?:led|ler|ling)?|"
-                r"contr[oô]l\w*|r[eé]gul\w*|control strategy|setpoint|"
-                r"consigne|manipulated variable|variable manipul[eé]e)\b"
+                r"control\w*|regul\w*|control strategy|setpoint|"
+                r"consigne|manipulated variable|variable manipulee)\b"
             ),
             "control_term",
+        ),
+        (
+            QuestionType.MOMENTUM_DIFFUSION,
+            re.compile(
+                r"\b(?:momentum diffusion|momentum transport|"
+                r"transport of momentum|diffusion de quantite de mouvement|"
+                r"transport de quantite de mouvement|انتقال الزخم)\b"
+            ),
+            "momentum_transport_term",
         ),
         (
             QuestionType.BALANCE,
@@ -137,60 +173,75 @@ def classify_question(question: str) -> QuestionClassification:
                 r"(?:\s+(?:or|and)\s+\w+)?\s+balance\b|"
                 r"\bbalance\s+(?:of\s+)?(?:mass|material|component|species|"
                 r"energy|heat|enthalpy|p2o5)\b|"
-                r"\bbilan\s+(?:(?:global|mati[eè]re|massique|"
-                r"[eé]nerg[eé]tique|thermique)\b|(?:de|du|des|d['’])\s*p2o5\b|p2o5\b)"
+                r"\bbilan\s+(?:(?:global|matiere|massique|"
+                r"energetique|thermique)\b|(?:de|du|des|d)\s*p2o5\b|p2o5\b)"
             ),
             "balance_term",
         ),
         (
             QuestionType.EQUATION_EXPLANATION,
-            re.compile(r"\b(?:equation|équation|formula|formule|define variables|variables)\b"),
+            re.compile(r"\b(?:equation|formula|formule|define variables|variables)\b"),
             "equation_term",
         ),
         (
             QuestionType.TABLE_QUESTION,
-            re.compile(r"\b(?:table|tableau|tabulated|valeurs tabulées)\b"),
+            re.compile(r"\b(?:table|tableau|tabulated|valeurs tabulees)\b"),
             "table_term",
         ),
         (
             QuestionType.THERMODYNAMIC_RELATION,
             re.compile(
                 r"\b(?:relation).*"
-                r"(?:pression|pressure|température|temperature|enthalp|entropy)\b"
+                r"(?:pression|pressure|temperature|enthalp|entropy)\b"
             ),
             "thermodynamic_relation",
         ),
         (
             QuestionType.COMPARISON,
-            re.compile(r"\b(?:difference|différence|compare|versus|vs\.?)\b"),
+            re.compile(r"\b(?:difference|compare|versus|vs\.?)\b"),
             "comparison_term",
         ),
         (
             QuestionType.PROCESS_FLOW,
-            re.compile(r"\b(?:trajet|path|flow through|étape par étape|step by step)\b"),
+            re.compile(r"\b(?:trajet|path|flow through|etape par etape|step by step)\b"),
             "flow_sequence",
         ),
         (
             QuestionType.PROCEDURE,
-            re.compile(r"\b(?:procedure|procédure|how to|comment démarrer|séquence)\b"),
+            re.compile(r"\b(?:procedure|how to|comment demarrer|sequence)\b"),
             "procedure_term",
         ),
         (
-            QuestionType.PLANT_SPECIFIC,
-            re.compile(r"\b(?:atelier|installation|ocp|sur site|installed plant)\b"),
-            "plant_term",
+            QuestionType.EXPLANATION,
+            re.compile(
+                r"\b(?:why|pourquoi|role|rôle|how does|دور|لماذا|كيف)\b"
+            ),
+            "explanation_focus",
         ),
         (
             QuestionType.DEFINITION,
             re.compile(
-                r"^(?:what is|what are|qu'est-ce que|qu'est-ce qu['’](?:un|une)|"
-                r"c'est quoi|définis?)\b"
+                r"(?:^|\b)(?:what is|what are|define|definition of|"
+                r"qu est ce que|qu est ce qu un|qu est ce qu une|"
+                r"c est quoi|cest quoi|c quoi|definis?|explique moi ce qu est|"
+                r"ما هو|ما هي|عرّف|عرف)\b"
             ),
             "definition_form",
         ),
         (
+            QuestionType.PLANT_SPECIFIC,
+            re.compile(
+                r"\b(?:atelier|installation|ocp|jfc4|echelon|sur site|"
+                r"installed plant|design reel|historique)\b"
+            ),
+            "plant_term",
+        ),
+        (
             QuestionType.EXPLANATION,
-            re.compile(r"\b(?:why|pourquoi|explain|explique|role|rôle|how does|comment)\b"),
+            re.compile(
+                r"\b(?:why|pourquoi|explain|explique|role|how does|"
+                r"comment|دور|لماذا|كيف)\b"
+            ),
             "explanation_form",
         ),
     )

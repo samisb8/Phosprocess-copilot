@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -104,6 +105,18 @@ _REQUIREMENT_QUERY_HINTS: dict[str, tuple[str, ...]] = {
     "energy_balance": (
         "evaporator energy heat enthalpy balance steam",
     ),
+    "p2o5_conservation": (
+        "JFC4 bilan matière P2O5 ligne 1 ligne 5 ligne 6",
+    ),
+    "p2o5_feed": (
+        "ligne 1 entrée acide débit P2O5 alimentation",
+    ),
+    "p2o5_product": (
+        "ligne 5 sortie acide débit P2O5 produit",
+    ),
+    "p2o5_entrainment": (
+        "ligne 6 sortie bouilleur P2O5 entraîné gaz",
+    ),
 }
 
 _QUESTION_TYPE_CHUNKS: dict[str, frozenset[TechnicalChunkType]] = {
@@ -152,6 +165,14 @@ _QUESTION_TYPE_CHUNKS: dict[str, frozenset[TechnicalChunkType]] = {
     ),
     "control_strategy": frozenset(
         {TechnicalChunkType.CONTROL_STRATEGY}
+    ),
+    "momentum_diffusion": frozenset(
+        {
+            TechnicalChunkType.DEFINITION,
+            TechnicalChunkType.EQUATION,
+            TechnicalChunkType.EQUATION_EXPLANATION,
+            TechnicalChunkType.NARRATIVE,
+        }
     ),
     "safety": frozenset({TechnicalChunkType.SAFETY}),
 }
@@ -254,6 +275,38 @@ class QualityRetrievalEngine:
 
             source_boost = routing.soft_boosts.get(result.chunk.document_id, 0.0)
             type_boost = DEFAULT_CHUNK_TYPE_BOOSTS.get(chunk_type, 0.0)
+            heading = " ".join(
+                str(value)
+                for value in (
+                    getattr(result.chunk, "chapter", ""),
+                    getattr(result.chunk, "section", ""),
+                    getattr(result.chunk, "subsection", ""),
+                    getattr(result.chunk, "hierarchy_path", ""),
+                )
+                if value
+            )
+            decomposed_heading = unicodedata.normalize(
+                "NFKD",
+                heading.casefold(),
+            )
+            normalized_heading = re.sub(
+                r"[^a-z0-9%]+",
+                " ",
+                "".join(
+                    character
+                    for character in decomposed_heading
+                    if not unicodedata.combining(character)
+                ),
+            ).strip()
+            section_boost = (
+                0.025
+                if normalized_heading
+                and any(
+                    term in normalized_heading
+                    for term in routing.section_affinity_terms
+                )
+                else 0.0
+            )
             preferred = _QUESTION_TYPE_CHUNKS.get(
                 question_type or "",
                 frozenset(),
@@ -289,7 +342,13 @@ class QualityRetrievalEngine:
                 if chunk_type in penalty_types.get(question_type or "", set())
                 else 0.0
             )
-            total_boost = source_boost + type_boost + intent_boost + intent_penalty
+            total_boost = (
+                source_boost
+                + type_boost
+                + section_boost
+                + intent_boost
+                + intent_penalty
+            )
             source_boost_by_id[result.chunk.chunk_id] = source_boost
             adjusted.append(
                 (
@@ -929,6 +988,7 @@ class QualityRetrievalEngine:
             plan.base_query,
             catalog=self.catalog,
             source_mode=source_mode,
+            question_type=question_type,
         )
         expanded = expand_technical_query(
             original_question,
@@ -953,6 +1013,19 @@ class QualityRetrievalEngine:
             else None
         )
         cross_encoder_k = max(30, candidate_k, top_k)
+        structured_roles = (
+            question_type
+            in {
+                "comparison",
+                "balance",
+                "troubleshooting",
+                "momentum_diffusion",
+            }
+            or (
+                question_type in {"definition", "explanation"}
+                and len(plan.roles) > 1
+            )
+        )
         hybrid = search_planned_hybrid(
             self.retriever,
             plan,
@@ -974,7 +1047,7 @@ class QualityRetrievalEngine:
                 question_type=question_type,
                 candidate_k=cross_encoder_k,
             )
-        if question_type in {"comparison", "balance", "troubleshooting"}:
+        if structured_roles:
             hybrid = self._recover_missing_role_candidates(
                 hybrid,
                 plan=plan,
@@ -1002,7 +1075,7 @@ class QualityRetrievalEngine:
             reranking,
             plan=plan,
         )
-        if question_type in {"comparison", "balance", "troubleshooting"}:
+        if structured_roles:
             reranking = replace(
                 reranking,
                 results=promote_required_roles_in_reranking(
@@ -1014,7 +1087,7 @@ class QualityRetrievalEngine:
         covered_roles: tuple[str, ...] = ()
         missing_roles: tuple[str, ...] = ()
 
-        if question_type in {"comparison", "balance", "troubleshooting"}:
+        if structured_roles:
             role_selection = select_role_aware_evidence(
                 plan,
                 hybrid.results,

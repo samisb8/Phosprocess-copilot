@@ -58,7 +58,7 @@ def test_quality_prompt_enforces_language_evidence_and_dynamic_length() -> None:
 
     assert "Answer exclusively in English." in system
     assert "Use only the supplied evidence bundles." in system
-    assert "Maximum answer length: 140 words" in package.user_prompt
+    assert "Maximum answer length: 230 words" in package.user_prompt
     assert "Document: Document 1" in package.user_prompt
     assert package.size.total_tokens < 3500
 

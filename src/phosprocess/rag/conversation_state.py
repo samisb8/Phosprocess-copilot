@@ -6,17 +6,34 @@ import re
 from dataclasses import asdict, dataclass, field
 
 _EQUIPMENT_PATTERNS = (
-    (re.compile(r"\b(?:évaporateur|evaporator)\b", re.I), "évaporateur"),
     (
         re.compile(
-            r"\b(?:évaporateur à circulation forcée|"
-            r"forced-circulation evaporator)\b",
+            r"\b(?:évaporateur à circulation forcée|evaporateur a circulation forcee|"
+            r"forced-circulation evaporator|forced circulation evaporator)\b",
             re.I,
         ),
         "évaporateur à circulation forcée",
     ),
-    (re.compile(r"\b(?:échangeur thermique|heat exchanger)\b", re.I), "échangeur thermique"),
-    (re.compile(r"\b(?:pompe de circulation|circulation pump)\b", re.I), "pompe de circulation"),
+    (
+        re.compile(r"\b(?:pompe de circulation|circulation pump)\b", re.I),
+        "pompe de circulation",
+    ),
+    (
+        re.compile(
+            r"\b(?:chambre de flash|flash chamber|vapor body|vapour body|"
+            r"bouilleur|غرفة التبخير|جسم المبخر)\b",
+            re.I,
+        ),
+        "chambre de vaporisation",
+    ),
+    (
+        re.compile(r"\b(?:échangeur thermique|echangeur thermique|heat exchanger)\b", re.I),
+        "échangeur thermique",
+    ),
+    (re.compile(r"\b(?:évaporateur|evaporator)\b", re.I), "évaporateur"),
+    (re.compile(r"\b(?:pompe à vide|pompe a vide|vacuum pump)\b", re.I), "pompe à vide"),
+    (re.compile(r"\b(?:condenseur|condenser)\b", re.I), "condenseur"),
+    (re.compile(r"\b(?:séparateur|separateur|separator)\b", re.I), "séparateur"),
     (re.compile(r"\b(?:réacteur|reactor)\b", re.I), "réacteur"),
     (re.compile(r"\b(?:filtre|filter)\b", re.I), "filtre"),
 )
@@ -119,6 +136,10 @@ class ConversationState:
     current_problem: str | None = None
     focus_entity: str | None = None
     current_document_scope: str = "auto"
+    current_source_mode: str = "auto"
+    source_scope_explicit: bool = False
+    source_scope_origin: str | None = None
+    last_question_type: str | None = None
     last_language: str | None = None
     last_user_question: str | None = None
     last_standalone_query: str | None = None
@@ -172,6 +193,36 @@ class ConversationState:
 
     def record_resolution(self, standalone_query: str) -> None:
         self.last_standalone_query = standalone_query.strip()
+
+    def record_source_scope(
+        self,
+        mode: str,
+        *,
+        explicit: bool,
+        origin: str = "question",
+    ) -> None:
+        """Persist an explicit source only for the active conversation thread."""
+
+        normalized = mode.strip().casefold() or "auto"
+        self.current_source_mode = normalized
+        self.current_document_scope = normalized
+        self.source_scope_explicit = explicit and normalized != "auto"
+        self.source_scope_origin = (
+            origin.strip().casefold()
+            if self.source_scope_explicit
+            else None
+        )
+
+    def release_source_scope(self) -> None:
+        """Return to automatic routing for a new autonomous question."""
+
+        self.current_source_mode = "auto"
+        self.current_document_scope = "auto"
+        self.source_scope_explicit = False
+        self.source_scope_origin = None
+
+    def record_question_type(self, question_type: str) -> None:
+        self.last_question_type = question_type.strip().casefold()
 
     def record_response(
         self,

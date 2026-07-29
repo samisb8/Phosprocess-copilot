@@ -1,0 +1,14 @@
+remove_boilerplate: true
+deduplicate_exact: true
+merge_small_chunks: true
+restore_uncovered_pages: true
+
+min_chunk_tokens: 80
+max_tokens: 700
+
+boilerplate_min_occurrences: 4
+boilerplate_min_fraction: 0.20
+boilerplate_max_line_characters: 160
+
+fallback_overlap_tokens: 40
+pipeline_version: "0.1.0"

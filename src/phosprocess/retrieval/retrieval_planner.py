@@ -31,6 +31,7 @@ class RetrievalPlan:
     roles: tuple[EvidenceRole, ...]
     comparison_subjects: tuple[str, str] | None = None
     balance_kind: str | None = None
+    answer_intent: str | None = None
 
     @property
     def queries(self) -> tuple[str, ...]:
@@ -102,7 +103,30 @@ def _extract_comparison_subjects(question: str) -> tuple[str, str] | None:
 
 def _balance_kind(question: str) -> str:
     normalized = question.casefold().replace("₂", "2").replace("₅", "5")
-    if any(term in normalized for term in ("p2o5", "species", "component", "espèce", "composant")):
+    p2o5 = "p2o5" in normalized
+    plant = any(
+        term in normalized
+        for term in (
+            "jfc4",
+            "echelon",
+            "échelon",
+            "rapport ocp",
+            "rapport atelier",
+            "ocp report",
+        )
+    )
+    if p2o5 and plant:
+        return "p2o5_plant"
+    if any(
+        term in normalized
+        for term in (
+            "p2o5",
+            "species",
+            "component",
+            "espèce",
+            "composant",
+        )
+    ):
         return "species"
     energy_terms = (
         "energy",
@@ -115,6 +139,55 @@ def _balance_kind(question: str) -> str:
     if any(term in normalized for term in energy_terms):
         return "energy"
     return "overall_mass"
+
+
+def _normalized_intent_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.casefold().replace("’", "'")).strip()
+
+
+def _scoped_explanation_intent(value: str) -> str | None:
+    normalized = _normalized_intent_text(value)
+    pump = any(
+        marker in normalized
+        for marker in (
+            "circulation pump",
+            "pompe de circulation",
+            "مضخة الدوران",
+        )
+    )
+    if not pump:
+        return None
+    if any(
+        marker in normalized
+        for marker in (
+            "back to the flash chamber",
+            "send the liquid back",
+            "return to the flash chamber",
+            "ramener le liquide",
+            "renvoyer le liquide",
+            "إعاد",
+        )
+    ):
+        return "pump_return"
+    if any(
+        marker in normalized
+        for marker in (
+            "necessary",
+            "nécessaire",
+            "necessaire",
+            "why",
+            "pourquoi",
+            "ضرورية",
+            "لماذا",
+        )
+    ):
+        return "pump_necessity"
+    if any(
+        marker in normalized
+        for marker in ("role", "rôle", "fonction", "what does", "دور")
+    ):
+        return "pump_role"
+    return None
 
 
 def build_retrieval_plan(
@@ -132,6 +205,114 @@ def build_retrieval_plan(
 
     projected = _english_technical_projection(f"{original} {standalone}")
     base_query = _compact(" ".join(part for part in (standalone, projected) if part))
+
+    if question_type == "definition":
+        roles = (
+            EvidenceRole(
+                "definition_nature",
+                f"{base_query} forced circulation evaporator equipment definition",
+                required=False,
+            ),
+            EvidenceRole(
+                "definition_mechanism",
+                f"{base_query} acid circulation pump heat exchanger pressure drop "
+                "large flow heating surface",
+            ),
+            EvidenceRole(
+                "definition_function",
+                f"{base_query} vapor body hot acid from heat exchanger "
+                "vapor liquid separation evaporation chamber",
+            ),
+        )
+        return RetrievalPlan(
+            question_type=question_type,
+            base_query=base_query,
+            roles=roles,
+            answer_intent="definition",
+        )
+
+    if question_type == "explanation":
+        intent = _scoped_explanation_intent(base_query)
+        if intent == "pump_necessity":
+            roles = (
+                EvidenceRole(
+                    "pump_circulation",
+                    f"{base_query} forced positive circulation independent evaporation rate",
+                ),
+                EvidenceRole(
+                    "pump_heating_path",
+                    f"{base_query} pump liquid through heating surface heat exchanger",
+                ),
+                EvidenceRole(
+                    "pump_process_function",
+                    f"{base_query} heat transfer vapor liquid separation separate functions",
+                    required=False,
+                ),
+            )
+            return RetrievalPlan(
+                question_type,
+                base_query,
+                roles,
+                answer_intent=intent,
+            )
+        if intent == "pump_role":
+            roles = (
+                EvidenceRole(
+                    "pump_withdrawal",
+                    f"{base_query} pump withdraws liquor from flash chamber",
+                    required=False,
+                ),
+                EvidenceRole(
+                    "pump_heating_path",
+                    f"{base_query} pump forces liquid through heating element",
+                ),
+                EvidenceRole(
+                    "pump_process_function",
+                    f"{base_query} heat transfer vapor liquid separation separate functions",
+                    required=False,
+                ),
+            )
+            return RetrievalPlan(
+                question_type,
+                base_query,
+                roles,
+                answer_intent=intent,
+            )
+        if intent == "pump_return":
+            roles = (
+                EvidenceRole(
+                    "pump_return_path",
+                    f"{base_query} withdraw flash chamber heating element back to flash chamber",
+                ),
+            )
+            return RetrievalPlan(
+                question_type,
+                base_query,
+                roles,
+                answer_intent=intent,
+            )
+
+    if question_type == "momentum_diffusion":
+        roles = (
+            EvidenceRole(
+                "momentum_transport",
+                f"{base_query} molecular transport of momentum momentum flux",
+            ),
+            EvidenceRole(
+                "velocity_gradient",
+                f"{base_query} velocity gradient adjacent fluid layers",
+            ),
+            EvidenceRole(
+                "newton_viscosity_law",
+                f"{base_query} Newton law of viscosity shear stress viscosity",
+            ),
+        )
+        return RetrievalPlan(
+            question_type=question_type,
+            base_query=base_query,
+            roles=roles,
+            answer_intent="momentum_diffusion",
+        )
 
     if question_type == "comparison":
         subjects = (
@@ -174,7 +355,30 @@ def build_retrieval_plan(
 
     if question_type == "balance":
         kind = _balance_kind(base_query)
-        if kind == "species":
+        if kind == "p2o5_plant":
+            roles = (
+                EvidenceRole(
+                    "p2o5_conservation",
+                    f"{base_query} bilan matière global P2O5 ligne 1 ligne 5 ligne 6",
+                    required=False,
+                ),
+                EvidenceRole(
+                    "p2o5_feed",
+                    f"{base_query} ligne 1 entrée acide débit P2O5 alimentation "
+                    "18.03 t/h 18030 kg/h",
+                ),
+                EvidenceRole(
+                    "p2o5_product",
+                    f"{base_query} ligne 5 sortie acide débit P2O5 produit "
+                    "18 t/h 18000 kg/h",
+                ),
+                EvidenceRole(
+                    "p2o5_entrainment",
+                    f"{base_query} ligne 6 sortie bouilleur P2O5 entraîné gaz "
+                    "30 kg/h",
+                ),
+            )
+        elif kind == "species":
             roles = (
                 EvidenceRole(
                     "species_conservation",

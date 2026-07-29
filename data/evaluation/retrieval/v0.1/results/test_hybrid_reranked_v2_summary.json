@@ -1,0 +1,30 @@
+{
+  "method": "hybrid_reranked",
+  "split": "test",
+  "single_test_run": true,
+  "retuning_allowed": false,
+  "frozen_dev_snapshot": "C:\\Users\\USER\\Desktop\\phosprocess-copilot\\data\\evaluation\\retrieval\\v0.1\\frozen\\dev_best_v2",
+  "frozen_dev_hashes": {
+    "retrieval_v2.yaml": "04DE6EF85B34C0E7D61AA9904392874DB136F2C7FFD62DC2129F0C59EFC37C12",
+    "reranking.yaml": "3A8DA7F3BFFD9592CFCC7A1139AE738B0FC919B49EAD3B652C5E81EEA761C0B0",
+    "hybrid.py": "074371D34A9529542F387DD0795E9FE2795229EE1AB82D7B585CC3F03168741B",
+    "reranker.py": "100A060F074FA2CE32AC0CA7ACBA589B5C52709A8E11DA71EBE70EC25E400737"
+  },
+  "gold_path": "C:\\Users\\USER\\Desktop\\phosprocess-copilot\\data\\evaluation\\retrieval\\v0.1\\frozen\\test_gold_final_v2\\gold_evidence_test_verified_auto.jsonl",
+  "gold_sha256": "93C417B7AA6ECE47172FCC9197BCFB0AB3C84055AB782D073A739B1A64E95F99",
+  "queries_path": "C:\\Users\\USER\\Desktop\\phosprocess-copilot\\data\\evaluation\\retrieval\\v0.1\\queries.jsonl",
+  "queries_sha256": "FA5EE9A1CFBC457E3008288ACD4E79D779697E39746A9CE97BEAB0EAD8DA5F35",
+  "candidate_k": 20,
+  "dense_candidates": 20,
+  "bm25_candidates": 20,
+  "query_expansion": true,
+  "top_k": 5,
+  "candidate_recall": 0.8333333333333334,
+  "hit_at_1": 0.5,
+  "hit_at_5": 0.7916666666666666,
+  "mrr_at_5": 0.6284722222222222,
+  "evidence_recall_at_5": 0.7916666666666666,
+  "mean_reranking_latency_ms": 354.1991666666667,
+  "median_reranking_latency_ms": 318.32050000000004,
+  "mean_total_latency_ms": 430.43564167843823
+}

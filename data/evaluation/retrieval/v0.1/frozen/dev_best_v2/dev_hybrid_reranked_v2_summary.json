@@ -1,0 +1,17 @@
+{
+  "method": "hybrid_reranked",
+  "split": "dev",
+  "candidate_k": 20,
+  "dense_candidates": 20,
+  "bm25_candidates": 20,
+  "query_expansion": true,
+  "top_k": 5,
+  "candidate_recall": 1.0,
+  "hit_at_1": 0.6875,
+  "hit_at_5": 0.9375,
+  "mrr_at_5": 0.7760416666666666,
+  "evidence_recall_at_5": 0.9375,
+  "mean_reranking_latency_ms": 385.5819375,
+  "median_reranking_latency_ms": 315.817,
+  "mean_total_latency_ms": 483.56238748237956
+}

@@ -1,0 +1,29 @@
+bm25:
+  method: lucene
+  k1: 1.2
+  b: 0.75
+  backend: numpy
+  csc_backend: numpy
+  minimum_score: 0.0
+  tokenizer:
+    version: technical_v1
+    use_stemming: false
+    remove_stopwords: false
+  data:
+    chunks_directory: data/processed/final_chunks
+  index:
+    output_directory: data/indexes/lexical/bm25s
+    metadata_filename: metadata.jsonl
+    manifest_filename: manifest.json
+  pipeline_version: 0.1.0
+hybrid:
+  fusion_method: rrf
+  dense_candidate_k: 15
+  bm25_candidate_k: 15
+  default_top_k: 5
+  rrf_k: 60
+  dense_weight: 1.0
+  bm25_weight: 1.0
+  lexical_query_expansion: true
+  query_expansion_version: phosphoric_v2
+  pipeline_version: 0.2.0

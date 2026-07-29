@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from phosprocess.retrieval.evidence_coverage import coverage_keys_for_text
+from phosprocess.retrieval.evidence_coverage import (
+    coverage_keys_for_text,
+    provenance_with_evidence_roles,
+)
 
 
 def test_process_flow_detects_weak_acid_feed_entry() -> None:
@@ -83,3 +86,20 @@ def test_process_flow_detects_conical_bottom_as_mandatory_evidence() -> None:
     keys = coverage_keys_for_text(text, "process_flow")
 
     assert "conical_bottom" in keys
+
+
+def test_process_flow_provenance_keeps_source_and_all_detected_roles() -> None:
+    text = (
+        "The acid enters through the feed inlet. The cycling acid leaves "
+        "the vapor body through a conical bottom. The circulation pump "
+        "forces it through the heat exchanger back to the flash chamber. "
+        "The concentrated product acid is withdrawn at the product outlet."
+    )
+
+    roles = coverage_keys_for_text(text, "process_flow")
+    provenance = provenance_with_evidence_roles("coverage_guard", roles)
+
+    assert provenance == (
+        "coverage_guard;evidence_roles:feed_inlet,conical_bottom,"
+        "pump_heat_exchanger,vapor_body,recirculation,product_outlet"
+    )

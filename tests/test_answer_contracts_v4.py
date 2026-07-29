@@ -7,9 +7,12 @@ import inspect
 import pytest
 from pydantic import ValidationError
 
+from phosprocess.rag.conversation_state import ConversationState
 from phosprocess.rag.fidelity import (
+    build_atomic_process_flow_answer,
     build_deterministic_balance_answer,
     enforce_answer_contract,
+    prune_unsupported_claims,
     validate_claim_support,
 )
 from phosprocess.rag.language import ResponseLanguage
@@ -150,6 +153,113 @@ def test_process_flow_contract_always_reconstructs_five_atomic_steps() -> None:
     assert "pump" in lines[2].casefold()
     assert "returns to the flash chamber" in lines[3].casefold()
     assert "product outlet" in lines[4].casefold()
+    validate_claim_support(result.answer, evidence)
+
+
+def test_process_flow_composite_stage_uses_retrieval_roles() -> None:
+    evidence = [
+        bundle(
+            1,
+            "The acid is fed through the inlet acid pipe. The cycling acid "
+            "leaves the vapor body through a conical bottom.",
+            provenance="evidence_role:feed_inlet",
+        ),
+        bundle(
+            2,
+            "The pump withdraws liquor from the flash chamber and forces it "
+            "through the heating element.",
+            provenance="evidence_role:pump_heat_exchanger",
+        ),
+        bundle(
+            3,
+            "The liquor returns to the flash chamber.",
+            provenance="evidence_role:recirculation",
+        ),
+        bundle(
+            4,
+            "Vapor-liquid separation takes place in the vapor body.",
+            provenance="evidence_role:vapor_body",
+        ),
+        bundle(
+            5,
+            "The concentrated finished product acid is withdrawn from the "
+            "vapor body at the product outlet.",
+            provenance="evidence_role:product_outlet",
+        ),
+    ]
+
+    answer = build_atomic_process_flow_answer(evidence, language="en")
+
+    assert answer is not None
+    assert len(answer.splitlines()) == 5
+    assert "returns to the flash chamber" in answer.casefold()
+    assert "vapor-liquid separation" in answer.casefold()
+    validate_claim_support(answer, evidence)
+
+
+def test_process_flow_builder_reads_coverage_guard_multi_role_provenance() -> None:
+    evidence = [
+        bundle(
+            1,
+            "The liquid phase is fed by the inlet acid pipe. The cycling "
+            "acid leaves the vapor body through a conical bottom. The "
+            "concentrated product acid is withdrawn at the product outlet.",
+            provenance=(
+                "coverage_guard;evidence_roles:feed_inlet,conical_bottom,"
+                "product_outlet"
+            ),
+        ),
+        bundle(
+            2,
+            "The pump withdraws liquor from the flash chamber and forces it "
+            "through the heating element back to the flash chamber. "
+            "Vapor-liquid separation takes place in the vapor body.",
+            provenance=(
+                "coverage_guard;evidence_roles:pump_heat_exchanger,"
+                "vapor_body,recirculation"
+            ),
+        ),
+    ]
+
+    answer = build_atomic_process_flow_answer(evidence, language="en")
+
+    assert answer is not None
+    assert len(answer.splitlines()) == 5
+    assert "returns to the flash chamber" in answer.casefold()
+    assert "vapor-liquid separation" in answer.casefold()
+    validate_claim_support(answer, evidence)
+
+
+def test_process_flow_pruning_builds_from_pre_pruning_evidence() -> None:
+    evidence = [
+        bundle(
+            1,
+            "The vapor body achieves vapor/liquid separation. The liquid "
+            "phase is fed by the inlet acid pipe coming from the heat "
+            "exchanger. The cycling acid leaves through a conical bottom. "
+            "The concentrated product is withdrawn at the product outlet.",
+            provenance="evidence_role:feed_inlet",
+        ),
+        bundle(
+            2,
+            "The pump withdraws liquor from the flash chamber and forces it "
+            "through the heating element back to the flash chamber. "
+            "Vapor-liquid separation takes place in the vapor body.",
+            provenance="evidence_role:recirculation_vapor_body",
+        ),
+    ]
+
+    result = prune_unsupported_claims(
+        "Unsupported generated wording without citations.",
+        evidence,
+        fallback_language="en",
+        question_type="process_flow",
+    )
+
+    assert result.atomic_plan_used is True
+    assert result.fallback_used is False
+    assert result.reconstructed_claim_count == 5
+    assert len(result.answer.splitlines()) == 5
     validate_claim_support(result.answer, evidence)
 
 
@@ -369,7 +479,7 @@ def test_p2o5_balance_builder_produces_component_equation() -> None:
 
     assert result.fallback_used is False
     assert "F x_F = P x_P + L_P2O5" in result.answer
-    assert "L_P2O5 = 0" in result.answer
+    assert "L_P2O5 = 0" not in result.answer
     validate_claim_support(result.answer, evidence)
 
 
@@ -472,4 +582,379 @@ def test_arabic_vapor_body_answer_is_canonically_validated() -> None:
 
     assert result.fallback_used is False
     assert "فصل البخار" in result.answer
+    validate_claim_support(result.answer, evidence)
+
+
+def test_pump_necessity_contract_uses_resolved_question_and_roles() -> None:
+    evidence = [
+        bundle(
+            1,
+            "A pump ensures circulation past the heating surface. "
+            "Circulation is maintained independently of evaporation rate.",
+            provenance="evidence_role:pump_circulation",
+        ),
+        bundle(
+            2,
+            "The pump forces the liquid through the heating element.",
+            provenance="evidence_role:pump_heating_path",
+        ),
+        bundle(
+            3,
+            "This separates heat transfer from vapor-liquid separation and "
+            "crystallization.",
+            provenance="evidence_role:pump_process_function",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "La pompe consomme de l'électricité et subit la corrosion [Source 1].",
+        evidence,
+        question_type="explanation",
+        language="fr",
+        question="Pourquoi la pompe de circulation est-elle nécessaire ?",
+    )
+
+    assert result.fallback_used is False
+    assert "maintient une circulation positive" in result.answer
+    assert "corrosion" not in result.answer.casefold()
+    validate_claim_support(result.answer, evidence)
+
+
+def test_explicit_source_scope_persists_only_across_followups() -> None:
+    rag = object.__new__(PhosProcessRAG)
+    rag.quality_engine = object()
+    state = ConversationState()
+
+    first = rag._resolve_turn_source_mode(
+        "auto",
+        question="Selon Becker, définis l'évaporateur à circulation forcée.",
+        follow_up=False,
+        state=state,
+    )
+    inherited = rag._resolve_turn_source_mode(
+        "auto",
+        question="Et pourquoi sa pompe est-elle nécessaire ?",
+        follow_up=True,
+        state=state,
+    )
+    reset = rag._resolve_turn_source_mode(
+        "auto",
+        question="Explique le coefficient global d'un échangeur.",
+        follow_up=False,
+        state=state,
+    )
+
+    assert first == "becker"
+    assert inherited == "becker"
+    assert reset == "auto"
+    assert state.source_scope_explicit is False
+
+
+def test_jfc4_p2o5_balance_builder_uses_report_values_and_loss() -> None:
+    evidence = [
+        bundle(
+            1,
+            "Le bilan de matière global de l'échelon J inclut le P2O5 "
+            "entrant, le produit et le P2O5 entraîné à la sortie du bouilleur.",
+            provenance="evidence_role:p2o5_conservation",
+        ),
+        bundle(
+            2,
+            "Le débit de P2O5 à l'entrée de la ligne 1 est 18,03 T/h.",
+            provenance="evidence_role:p2o5_feed",
+        ),
+        bundle(
+            3,
+            "Le débit de P2O5 à la sortie produit de la ligne 5 est 18 T/h.",
+            provenance="evidence_role:p2o5_product",
+        ),
+        bundle(
+            4,
+            "Le P2O5 entraîné à la sortie du bouilleur est égal à 30 kg/h.",
+            provenance="evidence_role:p2o5_entrainment",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Réponse incomplète [Source 1].",
+        evidence,
+        question_type="balance",
+        language="fr",
+        question=(
+            "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP."
+        ),
+        balance_kind="p2o5_plant",
+    )
+
+    assert result.fallback_used is False
+    assert "18,03" in result.answer
+    assert "18,00" in result.answer
+    assert "30 kg/h" in result.answer
+    assert "18,03 = 18,00 + 0,03 t/h" not in result.answer
+    validate_claim_support(result.answer, evidence)
+
+
+def test_momentum_diffusion_contract_excludes_fick_law() -> None:
+    evidence = [
+        bundle(
+            1,
+            "Molecular transport of momentum is described as a momentum flux "
+            "between adjacent fluid layers.",
+            provenance="evidence_role:momentum_transport",
+        ),
+        bundle(
+            2,
+            "The momentum flux is associated with a velocity gradient and "
+            "appears mechanically as shear stress.",
+            provenance="evidence_role:velocity_gradient",
+        ),
+        bundle(
+            3,
+            "Newton's law of viscosity relates shear stress to the velocity "
+            "gradient through the dynamic viscosity.",
+            provenance="evidence_role:newton_viscosity_law",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Fick's law uses a concentration gradient [Source 1].",
+        evidence,
+        question_type="momentum_diffusion",
+        language="en",
+        question="Explain momentum diffusion according to Bird.",
+    )
+
+    assert result.fallback_used is False
+    assert "velocity gradient" in result.answer.casefold()
+    assert "shear stress" in result.answer.casefold()
+    assert "dynamic viscosity" in result.answer.casefold()
+    assert "fick" not in result.answer.casefold()
+    assert "concentration gradient" not in result.answer.casefold()
+    validate_claim_support(result.answer, evidence)
+
+
+def test_explicit_all_sources_request_releases_source_lock() -> None:
+    rag = object.__new__(PhosProcessRAG)
+    rag.quality_engine = object()
+    state = ConversationState()
+    state.record_source_scope(
+        "becker",
+        explicit=True,
+        origin="user_question",
+    )
+
+    mode = rag._resolve_turn_source_mode(
+        "auto",
+        question="Cherche maintenant dans toutes les sources.",
+        follow_up=True,
+        state=state,
+    )
+
+    assert mode == "auto"
+    assert state.current_source_mode == "auto"
+    assert state.source_scope_explicit is False
+    assert state.source_scope_origin is None
+
+
+def test_p2o5_role_tags_cannot_inject_values_absent_from_evidence() -> None:
+    evidence = [
+        bundle(
+            1,
+            "Le bilan de matière global relie l'alimentation, le produit et "
+            "le P2O5 entraîné.",
+            provenance="evidence_role:p2o5_conservation",
+        ),
+        bundle(
+            2,
+            "Liste des figures : variation du débit d'acide d'entrée.",
+            provenance="evidence_role:p2o5_feed",
+        ),
+        bundle(
+            3,
+            "La productivité cible est 418 T P2O5/J.",
+            provenance="evidence_role:p2o5_product",
+        ),
+        bundle(
+            4,
+            "Le P2O5 entraîné à la sortie du bouilleur est 30 kg/h.",
+            provenance="evidence_role:p2o5_entrainment",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Réponse incomplète [Source 1].",
+        evidence,
+        question_type="balance",
+        language="fr",
+        question=(
+            "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP."
+        ),
+        balance_kind="p2o5_plant",
+    )
+
+    assert result.fallback_used is True
+    assert "18,03" not in result.answer
+    assert "18,00" not in result.answer
+
+
+def test_momentum_builder_ignores_mass_diffusion_role_mistag() -> None:
+    evidence = [
+        bundle(
+            1,
+            "Momentum is transmitted between adjacent fluid layers as a "
+            "molecular momentum flux.",
+            provenance="evidence_role:momentum_transport",
+        ),
+        bundle(
+            2,
+            "The velocity gradient is the driving force for momentum "
+            "transport and is expressed mechanically by shear stress.",
+            provenance="evidence_role:velocity_gradient",
+        ),
+        bundle(
+            3,
+            "This mass-transport chapter mentions Newton's law of viscosity, "
+            "then presents Fick's law, concentration gradient, and molecular "
+            "diffusivity.",
+            provenance="evidence_role:newton_viscosity_law",
+        ),
+        bundle(
+            4,
+            "Newton's law of viscosity relates shear stress to the velocity "
+            "gradient through dynamic viscosity.",
+            provenance="reranker_fill",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Fick's law explains diffusion [Source 3].",
+        evidence,
+        question_type="momentum_diffusion",
+        language="en",
+        question="Explain momentum diffusion according to Bird.",
+    )
+
+    assert result.fallback_used is False
+    assert "[Source 4]" in result.answer.splitlines()[-1]
+    assert "[Source 3]" not in result.answer.splitlines()[-1]
+    assert "Fick" not in result.answer
+    validate_claim_support(result.answer, evidence)
+
+
+def test_definition_builder_binds_becker_claims_to_semantic_sources() -> None:
+    evidence = [
+        bundle(
+            1,
+            "Two or three evaporators may operate in parallel or as a "
+            "multistage concentration system at several concentration levels.",
+            provenance="evidence_role:definition_nature",
+        ),
+        bundle(
+            2,
+            "The type of acid circulation pump depends on the pressure drop "
+            "of the heat exchanger. Large-diameter exchangers use pumps with "
+            "a large flow capacity.",
+            provenance="evidence_role:definition_mechanism",
+        ),
+        bundle(
+            3,
+            "The vapor body receives heated acid from the heat exchanger and "
+            "provides vapor-liquid separation between evaporated water and "
+            "recirculating acid.",
+            provenance="evidence_role:definition_function",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Réponse générique [Source 1].",
+        evidence,
+        question_type="definition",
+        language="fr",
+        question="C'est quoi un évaporateur à circulation forcée selon Becker ?",
+    )
+
+    assert result.fallback_used is False
+    assert "[Source 1]" not in result.answer
+    assert "[Source 2]" in result.answer.splitlines()[0]
+    assert "[Source 3]" in result.answer.splitlines()[1]
+    assert "perte de charge" in result.answer.casefold()
+    assert "séparation vapeur-liquide" in result.answer.casefold()
+    validate_claim_support(result.answer, evidence)
+
+
+def test_pump_builder_ignores_hazard_mistag_and_binds_flow_path_source() -> None:
+    evidence = [
+        bundle(
+            1,
+            "The circulation pump consumes electrical energy and its impeller "
+            "is exposed to chloride and fluoride corrosion.",
+            provenance="evidence_role:pump_heating_path",
+        ),
+        bundle(
+            2,
+            "The pump withdraws liquor from the flash chamber and forces it "
+            "through the heating element.",
+            provenance="reranker_fill",
+        ),
+        bundle(
+            3,
+            "This separates heat transfer, vapor-liquid separation, and "
+            "crystallization functions.",
+            provenance="evidence_role:pump_process_function",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "La pompe consomme de l'électricité [Source 1].",
+        evidence,
+        question_type="explanation",
+        language="fr",
+        question="Quel est le rôle de la pompe de circulation ?",
+    )
+
+    assert result.fallback_used is False
+    assert "[Source 2]" in result.answer.splitlines()[0]
+    assert "[Source 1]" not in result.answer
+    assert "corrosion" not in result.answer.casefold()
+    validate_claim_support(result.answer, evidence)
+
+
+def test_p2o5_composite_balance_binds_each_value_to_its_own_source() -> None:
+    evidence = [
+        bundle(
+            1,
+            "For P2O5, m6 entrained equals m1 feed minus m5 product. "
+            "The P2O5 entrained at the boiler outlet is 30 kg/h.",
+            provenance=(
+                "evidence_roles:p2o5_conservation,p2o5_entrainment"
+            ),
+        ),
+        bundle(
+            2,
+            "The stage-J feed, line 1, contains 18.03 t/h of P2O5.",
+            provenance="evidence_role:p2o5_feed",
+        ),
+        bundle(
+            3,
+            "The concentrated product at line 5 contains 18.00 t/h of P2O5.",
+            provenance="evidence_role:p2o5_product",
+        ),
+    ]
+
+    result = enforce_answer_contract(
+        "Réponse incomplète [Source 1].",
+        evidence,
+        question_type="balance",
+        language="fr",
+        question=(
+            "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP."
+        ),
+        balance_kind="p2o5_plant",
+    )
+
+    assert result.fallback_used is False
+    lines = result.answer.splitlines()
+    assert "[Source 2]" in next(line for line in lines if "18,03" in line)
+    assert "[Source 3]" in next(line for line in lines if "18,00" in line)
+    assert "[Source 1]" in next(line for line in lines if "30 kg/h" in line)
     validate_claim_support(result.answer, evidence)

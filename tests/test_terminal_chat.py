@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from io import StringIO
 
 import pytest
 from scripts.chat_phosprocess import build_parser, configure_utf8_console
 
-from phosprocess.rag.conversation_memory import ConversationMemory
+from phosprocess.rag.conversation_memory import (
+    ConversationHistoryContext,
+    ConversationMemory,
+)
 from phosprocess.rag.prompts import limit_history
-from phosprocess.rag.schemas import ChatMessage
+from phosprocess.rag.schemas import (
+    ChatMessage,
+    RAGResponse,
+    RAGStreamEvent,
+    RAGTimings,
+)
 from phosprocess.rag.terminal_chat import (
     ChatSessionState,
+    TerminalChat,
     handle_command,
     print_latency_table,
 )
@@ -173,3 +183,124 @@ def test_language_and_debug_commands_change_session_state() -> None:
     handle_command("/debug off", state=state, output=output)
 
     assert state.debug_enabled is False
+
+
+def test_source_auto_command_releases_conversation_source_lock() -> None:
+    output = StringIO()
+    state = ChatSessionState()
+    state.memory.state.record_source_scope(
+        "becker",
+        explicit=True,
+        origin="user_question",
+    )
+
+    handle_command("/source auto", state=state, output=output)
+
+    assert state.source_mode == "auto"
+    assert state.memory.state.current_source_mode == "auto"
+    assert state.memory.state.source_scope_explicit is False
+
+
+def test_terminal_persists_source_lock_resolved_inside_pipeline() -> None:
+    class FakeService:
+        @staticmethod
+        def create_conversation_memory(
+            *,
+            enabled: bool = True,
+        ) -> ConversationMemory:
+            return ConversationMemory(enabled=enabled)
+
+        @staticmethod
+        def stream_answer(
+            _question: str,
+            history_context: ConversationHistoryContext,
+            **_kwargs: object,
+        ) -> Iterator[RAGStreamEvent]:
+            business_state = history_context.business_state
+            assert business_state is not None
+            business_state.record_source_scope(
+                "becker",
+                explicit=True,
+                origin="user_question",
+            )
+            response = RAGResponse(
+                question="Question",
+                answer="Réponse validée.",
+                insufficient_context=True,
+                model_name="test",
+                selected_variant="direct",
+                snapshot_sha256="A" * 64,
+                candidate_count=0,
+                selected_count=0,
+                source_policy_route="direct_no_retrieval",
+                response_language="fr",
+                timings=RAGTimings(
+                    hybrid_ms=0,
+                    reranking_ms=0,
+                    generation_ms=1,
+                    total_ms=1,
+                ),
+            )
+            yield RAGStreamEvent(
+                event_type="completed",
+                response=response,
+            )
+
+    state = ChatSessionState()
+    chat = TerminalChat(
+        FakeService(),
+        output=StringIO(),
+    )
+    chat.state = state
+
+    chat._answer("Cherche uniquement dans Becker.")
+
+    assert state.memory.state.current_source_mode == "becker"
+    assert state.memory.state.source_scope_explicit is True
+
+
+def test_terminal_persists_source_and_focus_after_retrieval_error() -> None:
+    class FailingService:
+        @staticmethod
+        def create_conversation_memory(
+            *,
+            enabled: bool = True,
+        ) -> ConversationMemory:
+            return ConversationMemory(enabled=enabled)
+
+        @staticmethod
+        def stream_answer(
+            _question: str,
+            history_context: ConversationHistoryContext,
+            **_kwargs: object,
+        ) -> Iterator[RAGStreamEvent]:
+            business_state = history_context.business_state
+            assert business_state is not None
+            business_state.record_source_scope(
+                "becker",
+                explicit=True,
+                origin="user_question",
+            )
+            business_state.focus_entity = "pompe de circulation"
+            business_state.current_equipment = "pompe de circulation"
+            yield RAGStreamEvent(
+                event_type="error",
+                content="Preuves incomplètes.",
+            )
+
+    state = ChatSessionState()
+    chat = TerminalChat(
+        FailingService(),
+        output=StringIO(),
+    )
+    chat.state = state
+
+    chat._answer(
+        "Cherche uniquement dans Becker. "
+        "Quel est le rôle de sa pompe de circulation ?"
+    )
+
+    assert state.memory.state.current_source_mode == "becker"
+    assert state.memory.state.source_scope_explicit is True
+    assert state.memory.state.focus_entity == "pompe de circulation"
+    assert state.memory.get_recent_turns() == []

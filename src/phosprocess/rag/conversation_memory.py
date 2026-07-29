@@ -167,6 +167,17 @@ class ConversationMemory:
         self.state.observe_question(clean_user)
         self.update_summary_if_needed()
 
+    def synchronize_business_state(self, state: ConversationState) -> None:
+        """Replace the session state with the state resolved during one turn.
+
+        ``build_history_context`` intentionally returns a copy so retrieval cannot
+        mutate session memory before a response is validated.  Once a validated
+        response is complete, the caller uses this method to persist resolved
+        entities and an explicit source lock for the next follow-up.
+        """
+
+        self.state = ConversationState(**asdict(state))
+
     def update_summary_if_needed(self) -> bool:
         """Summarize only turns leaving the recent buffer, without an LLM."""
 

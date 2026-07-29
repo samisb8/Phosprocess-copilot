@@ -1,0 +1,145 @@
+{
+  "components": [
+    {
+      "byte_identical": true,
+      "file": "retrieval_v2.yaml",
+      "frozen_sha256": "04DE6EF85B34C0E7D61AA9904392874DB136F2C7FFD62DC2129F0C59EFC37C12",
+      "source": "data/evaluation/retrieval/v0.1/frozen/dev_best_v2/retrieval_v2.yaml",
+      "source_sha256": "04DE6EF85B34C0E7D61AA9904392874DB136F2C7FFD62DC2129F0C59EFC37C12"
+    },
+    {
+      "byte_identical": true,
+      "file": "reranking.yaml",
+      "frozen_sha256": "3A8DA7F3BFFD9592CFCC7A1139AE738B0FC919B49EAD3B652C5E81EEA761C0B0",
+      "source": "data/evaluation/retrieval/v0.1/frozen/dev_best_v2/reranking.yaml",
+      "source_sha256": "3A8DA7F3BFFD9592CFCC7A1139AE738B0FC919B49EAD3B652C5E81EEA761C0B0"
+    },
+    {
+      "byte_identical": true,
+      "file": "hybrid.py",
+      "frozen_sha256": "074371D34A9529542F387DD0795E9FE2795229EE1AB82D7B585CC3F03168741B",
+      "source": "src/phosprocess/retrieval/hybrid.py",
+      "source_sha256": "074371D34A9529542F387DD0795E9FE2795229EE1AB82D7B585CC3F03168741B"
+    },
+    {
+      "byte_identical": true,
+      "file": "reranker.py",
+      "frozen_sha256": "100A060F074FA2CE32AC0CA7ACBA589B5C52709A8E11DA71EBE70EC25E400737",
+      "source": "src/phosprocess/reranking/reranker.py",
+      "source_sha256": "100A060F074FA2CE32AC0CA7ACBA589B5C52709A8E11DA71EBE70EC25E400737"
+    },
+    {
+      "byte_identical": true,
+      "file": "v3_selection.py",
+      "frozen_sha256": "E3F31A45887907E599DE0CF36020D125F9B1B04DA4A719134371F4B503783958",
+      "source": "src/phosprocess/retrieval/v3_selection.py",
+      "source_sha256": "E3F31A45887907E599DE0CF36020D125F9B1B04DA4A719134371F4B503783958"
+    },
+    {
+      "byte_identical": true,
+      "file": "lexical_safeguard_v3.yaml",
+      "frozen_sha256": "F0541EE50A8B909568196B7C1917812BB5661CB3F02C571ED4687AF44B85F228",
+      "source": "configs/lexical_safeguard_v3.yaml",
+      "source_sha256": "F0541EE50A8B909568196B7C1917812BB5661CB3F02C571ED4687AF44B85F228"
+    },
+    {
+      "byte_identical": true,
+      "file": "robustness_summary.json",
+      "frozen_sha256": "1BD0F512C8CADB4013E88C138CAD9360CBF100B34BE360DB4DEBEE1867DD0B59",
+      "source": "data/evaluation/retrieval/v0.1/v3/robustness/robustness_summary.json",
+      "source_sha256": "1BD0F512C8CADB4013E88C138CAD9360CBF100B34BE360DB4DEBEE1867DD0B59"
+    },
+    {
+      "byte_identical": true,
+      "file": "parameter_sensitivity.csv",
+      "frozen_sha256": "90DCCF2717E38C1128E1C81E909843BA53473FE901A56644F674444ED366DD3C",
+      "source": "data/evaluation/retrieval/v0.1/v3/robustness/parameter_sensitivity.csv",
+      "source_sha256": "90DCCF2717E38C1128E1C81E909843BA53473FE901A56644F674444ED366DD3C"
+    }
+  ],
+  "determinism": {
+    "all_variant_selections_stable": true,
+    "baseline_same_top5": true,
+    "current_same_metrics": true,
+    "current_same_top5": true,
+    "repetitions": 3,
+    "stable_current_queries": 16,
+    "total_current_queries": 16
+  },
+  "dev_metrics": {
+    "candidate_recall_at_20": 1.0,
+    "evidence_recall_at_5": 1.0,
+    "hit_at_1": 0.6875,
+    "hit_at_5": 1.0,
+    "mrr_at_5": 0.7885416666666667
+  },
+  "files": [
+    "hybrid.py",
+    "lexical_safeguard_v3.yaml",
+    "parameter_sensitivity.csv",
+    "reranker.py",
+    "reranking.yaml",
+    "retrieval_v2.yaml",
+    "robustness_summary.json",
+    "v3_selection.py",
+    "freeze_manifest.json",
+    "sha256.csv",
+    "dev_best_v3_report.md"
+  ],
+  "frozen_at": "2026-07-26T20:50:52.318288+01:00",
+  "integrity": {
+    "all_component_hashes_verified": true,
+    "all_source_copies_byte_identical": true,
+    "one_selected_variant": true,
+    "read_only_windows": true,
+    "v2_sources_unchanged_after_copy": true
+  },
+  "parameters": {
+    "bm25_candidates": 20,
+    "candidate_k": 20,
+    "dense_candidates": 20,
+    "duplicate_policy": "skip",
+    "fallback": "next_reranker_result",
+    "lexical_order": [
+      "bm25_rank_ascending",
+      "hybrid_rank_ascending",
+      "chunk_id_ascending"
+    ],
+    "lexical_slots": 1,
+    "lexical_source": "bm25",
+    "query_expansion": true,
+    "reranker_leading_slots": 4,
+    "top_k": 5
+  },
+  "robustness_validation_id": "v3_lexical_safeguard_robustness_001",
+  "schema_version": "1.0",
+  "scope": "dev_only",
+  "selected_variant": "lexical_safeguard_001",
+  "selection_ranking": [
+    "lexical_safeguard_001",
+    "strict_lexical_slots_0",
+    "permissive_lexical_slots_2"
+  ],
+  "selection_rule": [
+    "no_candidate_recall_at_20_regression",
+    "maximize_evidence_recall_at_5",
+    "maximize_hit_at_5",
+    "maximize_mrr_at_5",
+    "maximize_hit_at_1",
+    "minimize_complexity",
+    "minimize_policy_latency"
+  ],
+  "single_selected_variant": true,
+  "snapshot_sha256": "090C0CC191317DF0CBF068725144FEA567995EFD0E7EAE64EE1EB8DD9006A4EE",
+  "status": "frozen_dev_best_v3",
+  "test_usage": {
+    "explicit_statement": "Aucun TEST utilisé.",
+    "test_artifacts_read": false,
+    "test_evaluation_run": false
+  },
+  "variant_regressions": {
+    "lexical_safeguard_001": 0,
+    "permissive_lexical_slots_2": 1,
+    "strict_lexical_slots_0": 0
+  }
+}

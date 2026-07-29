@@ -1,0 +1,78 @@
+pipeline_version: quality-v2.0-hierarchical
+
+ingestion:
+  parser: docling
+  fallback_parser: pymupdf
+  table_structure: true
+  formula_enrichment: false
+  batch_page_count: 500
+  maximum_corrupted_fraction: 0.30
+  ocr:
+    enabled: false
+    only_when_required: true
+
+chunking:
+  strategy: docling_hybrid_parent_child
+  tokenizer: BAAI/bge-m3
+  child:
+    target_tokens: 420
+    minimum_tokens: 160
+    maximum_tokens: 560
+    overlap_tokens: 70
+  parent:
+    target_tokens: 1250
+    maximum_tokens: 1700
+  boundaries:
+    preserve_chapters: true
+    preserve_sections: true
+    preserve_subsections: true
+    preserve_paragraphs: true
+    preserve_lists: true
+    preserve_tables: true
+    preserve_table_headers: true
+    preserve_equations: true
+    preserve_figure_captions: true
+    preserve_examples: true
+
+retrieval:
+  hierarchical:
+    enabled: true
+    section_candidate_k: 30
+    section_top_k: 8
+    max_sections_per_document: 3
+    max_chunks_per_section: 2
+    final_evidence_count: 5
+  evidence_expansion:
+    enabled: true
+    neighbor_window: 1
+    include_parent: conditional
+    max_tokens_per_bundle: 650
+    max_total_context_tokens: 2600
+
+answer_policy:
+  definition:
+    max_words: 140
+  explanation:
+    max_words: 230
+  process_flow:
+    max_words: 320
+    numbered_steps: true
+  procedure:
+    max_words: 320
+    numbered_steps: true
+  comparison:
+    max_words: 260
+  balance:
+    max_words: 300
+    define_variables: true
+    preserve_units: true
+  equation_explanation:
+    max_words: 300
+    define_variables: true
+    preserve_units: true
+  calculation:
+    max_words: 350
+    show_assumptions: true
+  troubleshooting:
+    max_words: 300
+    organize_as_causes_effects_actions: true

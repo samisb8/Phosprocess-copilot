@@ -96,7 +96,11 @@ from phosprocess.reranking.reranker import (
     clean_passage_text,
     load_reranking_config,
 )
-from phosprocess.retrieval.domain_router import route_query
+from phosprocess.retrieval.domain_router import (
+    detect_explicit_source_mode,
+    requests_automatic_source_scope,
+    route_query,
+)
 from phosprocess.retrieval.evidence_bundle import EvidenceBundle
 from phosprocess.retrieval.hybrid import (
     HybridRetriever,
@@ -286,32 +290,36 @@ class WarmupRuntimeConfig:
 
 
 def _default_source_policy_config() -> SourcePolicyConfig:
-    """Return production defaults when configuration is injected in tests."""
+    """Return eight-document defaults for legacy/rollback indexes."""
 
+    sources = (
+        "01_becker_phosphates_and_phosphoric_acid.pdf",
+        "02_chemical_engineering_thermodynamics_9e.pdf",
+        "03_fundamentals_heat_mass_transfer.pdf",
+        "04_rapport_atelier_acide_phosphorique.pdf",
+        "05_perrys_chemical_engineers_handbook_9e.pdf",
+        "06_mullin_crystallization_4e.pdf",
+        "07_process_dynamics_control_seborg_4e.pdf",
+        "08_transport_phenomena_bird_2e.pdf",
+    )
     return SourcePolicyConfig(
-        enabled=True,
-        default_priority=(
-            "01_becker_phosphates_and_phosphoric_acid.pdf",
-            "03_unido_phosphate_process_technologies.pdf",
-            "02_jacobs_largest_phosphoric_acid_plant.pdf",
-            "04_rapport_atelier_acide_phosphorique.pdf",
-        ),
+        enabled=False,
+        default_priority=sources,
         domain_routes={
-            "general": (
-                "01_becker_phosphates_and_phosphoric_acid.pdf",
-            ),
-            "jacobs": (
-                "02_jacobs_largest_phosphoric_acid_plant.pdf",
-                "01_becker_phosphates_and_phosphoric_acid.pdf",
-            ),
-            "ocp_atelier": (
-                "04_rapport_atelier_acide_phosphorique.pdf",
-                "01_becker_phosphates_and_phosphoric_acid.pdf",
-            ),
+            "general": (sources[4], sources[0]),
+            "phosphoric_acid": (sources[0], sources[3], sources[4]),
+            "plant_specific": (sources[3], sources[0], sources[4]),
+            "thermodynamics": (sources[1], sources[4], sources[3]),
+            "heat_transfer": (sources[2], sources[4], sources[3]),
+            "equipment": (sources[4], sources[0], sources[3]),
+            "crystallization": (sources[5], sources[0]),
+            "control": (sources[6], sources[3]),
+            "transport": (sources[7], sources[4]),
         },
         minimum_preferred_chunks=2,
         allow_fallback=True,
     )
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -470,16 +478,12 @@ def load_runtime_config(
 
     parsed_routes: dict[str, tuple[str, ...]] = {}
 
-    for route_name in ("general", "jacobs", "ocp_atelier"):
-        route = domain_routes.get(route_name)
-
-        if not isinstance(route, dict):
+    for route_name, route in domain_routes.items():
+        if not isinstance(route_name, str) or not isinstance(route, dict):
             raise RAGConfigurationError(
-                f"Route documentaire absente : {route_name}."
+                "Route documentaire invalide dans source_policy."
             )
-
         preferred_sources = route.get("preferred_sources")
-
         if (
             not isinstance(preferred_sources, list)
             or not all(
@@ -490,8 +494,12 @@ def load_runtime_config(
             raise RAGConfigurationError(
                 f"Sources préférées invalides : {route_name}."
             )
-
         parsed_routes[route_name] = tuple(preferred_sources)
+
+    if "general" not in parsed_routes:
+        raise RAGConfigurationError(
+            "Route documentaire absente : general."
+        )
 
     return RAGRuntimeConfig(
         ollama=load_ollama_config(path),
@@ -1298,10 +1306,17 @@ class PhosProcessRAG:
                 started=started,
             )
 
+        effective_source_mode = source_mode
+        if self.quality_engine is not None:
+            effective_source_mode = (
+                detect_explicit_source_mode(normalized)
+                or self._quality_source_mode(source_mode)
+            )
+
         retrieved = self._retrieve_with_source_policy(
             normalized,
             policy_question=normalized,
-            source_mode=source_mode,
+            source_mode=effective_source_mode,
         )
         system_prompt = SYSTEM_PROMPT
         repair_system_prompt = REPAIR_SYSTEM_PROMPT
@@ -1491,18 +1506,41 @@ class PhosProcessRAG:
             if reformulated:
                 metrics.reformulation_ms = detection_elapsed
 
+            effective_source_mode = self._resolve_turn_source_mode(
+                source_mode,
+                question=normalized,
+                follow_up=follow_up,
+                state=business_state,
+            )
+            LOGGER.info(
+                "CONVERSATION_CONTEXT follow_up=%s focus_entity=%s "
+                "active_source=%s source_lock=%s source_origin=%s",
+                follow_up,
+                business_state.focus_entity or "none",
+                business_state.current_source_mode,
+                business_state.source_scope_explicit,
+                business_state.source_scope_origin or "none",
+            )
+
             language = detect_response_language(
                 normalized,
                 last_explicit_language=business_state.last_language,
                 mode=language_mode,
             )
             classification = classify_question(retrieval_query)
+            business_state.record_question_type(
+                classification.question_type.value
+            )
 
             if self.quality_engine is not None:
                 routing_preview = route_query(
                     retrieval_query,
                     catalog=self.quality_engine.catalog,
-                    source_mode=self._quality_source_mode(source_mode),
+                    source_mode=self._quality_source_mode(
+                        effective_source_mode
+                    ),
+                    question_type=classification.question_type.value,
+                    focus_entity=business_state.focus_entity,
                 )
                 route_label = ",".join(
                     domain.value
@@ -1523,7 +1561,7 @@ class PhosProcessRAG:
             else:
                 policy_decision = self._decide_source_policy(
                     f"{normalized} {retrieval_query}",
-                    mode=source_mode,
+                    mode=effective_source_mode,
                 )
                 route_label = policy_decision.route
                 primary_label = policy_decision.primary_label
@@ -1545,7 +1583,7 @@ class PhosProcessRAG:
             retrieved = self._retrieve_with_source_policy(
                 retrieval_query,
                 policy_question=normalized,
-                source_mode=source_mode,
+                source_mode=effective_source_mode,
                 metrics=metrics,
             )
             retrieved.response_language = language.language.value
@@ -2080,6 +2118,46 @@ class PhosProcessRAG:
             total_history_max_tokens=config.total_history_max_tokens,
         )
 
+    def _resolve_turn_source_mode(
+        self,
+        requested_mode: str,
+        *,
+        question: str,
+        follow_up: bool,
+        state: ConversationState,
+    ) -> str:
+        """Resolve explicit, inherited and automatic source scope."""
+
+        if self.quality_engine is None:
+            return requested_mode
+
+        configured = self._quality_source_mode(requested_mode)
+        explicit = detect_explicit_source_mode(question)
+
+        if configured != "auto":
+            state.record_source_scope(
+                configured,
+                explicit=True,
+                origin="runtime_configuration",
+            )
+            return configured
+        if requests_automatic_source_scope(question):
+            state.release_source_scope()
+            return "auto"
+        if explicit is not None:
+            state.record_source_scope(
+                explicit,
+                explicit=True,
+                origin="user_question",
+            )
+            return explicit
+        if follow_up and state.source_scope_explicit:
+            return state.current_source_mode
+
+        if not follow_up:
+            state.release_source_scope()
+        return "auto"
+
     @staticmethod
     def _quality_source_mode(source_mode: str) -> str:
         """Normalize legacy terminal names to the quality router contract."""
@@ -2136,6 +2214,28 @@ class PhosProcessRAG:
                 "La recherche structurée qualité a échoué : "
                 f"{type(error).__name__}: {detail}"
             ) from error
+
+        LOGGER.info(
+            "ROUTING_DECISION intent=%s source_mode=%s explicit_source=%s "
+            "temporal_scope=%s domains=%s primary=%s hard_filter=%s "
+            "section_hints=%s",
+            result.routing.question_type,
+            result.routing.source_mode,
+            result.routing.explicit_source or "none",
+            result.routing.temporal_scope,
+            ",".join(
+                domain.value
+                for domain, _confidence in result.routing.detected_domains
+            )
+            or "none",
+            (
+                result.routing.preferred_documents[0]
+                if result.routing.preferred_documents
+                else "none"
+            ),
+            ",".join(sorted(result.routing.hard_filter or ())) or "none",
+            "|".join(result.routing.section_affinity_terms) or "none",
+        )
 
         LOGGER.debug(
             "RAG_QUALITY_QUERY original=%r standalone=%r dense=%r bm25=%r "

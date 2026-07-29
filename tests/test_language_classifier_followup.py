@@ -171,3 +171,64 @@ def test_multilingual_controlled_insufficiency(answer: str) -> None:
 
     assert citations == []
     assert insufficient is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "cest quoi un evaporateur a circulation forcee en wet process ?",
+        "c quoi un évaporateur à circulation forcée ?",
+        "Explique-moi ce qu'est un évaporateur à circulation forcée.",
+        "What is a forced-circulation evaporator?",
+        "ما هو المبخر ذو الدوران القسري؟",
+    ],
+)
+def test_informal_multilingual_definition_variants(question: str) -> None:
+    assert classify_question(question).question_type is QuestionType.DEFINITION
+
+
+def test_arabic_role_question_is_explanation_not_definition() -> None:
+    result = classify_question("ما هو دور غرفة التبخير في فصل البخار؟")
+
+    assert result.question_type is QuestionType.EXPLANATION
+
+
+def test_bare_why_followup_resolves_pump_necessity() -> None:
+    state = ConversationState()
+    state.observe_question(
+        "Quel est le rôle de la pompe de circulation dans l'évaporateur ?"
+    )
+
+    resolution = resolve_standalone_query("Et pourquoi ?", state=state)
+
+    assert resolution.standalone_query == (
+        "Pourquoi la pompe de circulation est-elle nécessaire ?"
+    )
+    assert resolution.intent_hint == "pump_necessity"
+
+
+def test_momentum_diffusion_has_dedicated_question_type() -> None:
+    result = classify_question(
+        "Explique la diffusion de quantité de mouvement dans un fluide selon Bird."
+    )
+
+    assert result.question_type is QuestionType.MOMENTUM_DIFFUSION
+
+
+def test_synchronized_business_state_persists_explicit_source_lock() -> None:
+    memory = ConversationMemory()
+    resolved = ConversationState(
+        focus_entity="pompe de circulation",
+        current_source_mode="becker",
+        current_document_scope="becker",
+        source_scope_explicit=True,
+        source_scope_origin="user_question",
+    )
+
+    memory.synchronize_business_state(resolved)
+    context = memory.build_history_context()
+
+    assert context.business_state is not None
+    assert context.business_state.current_source_mode == "becker"
+    assert context.business_state.source_scope_explicit is True
+    assert context.business_state.focus_entity == "pompe de circulation"

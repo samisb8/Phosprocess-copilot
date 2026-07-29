@@ -1,0 +1,18 @@
+scope: domain_quality_dev_v1_only
+historical_test_allowed: false
+
+variants:
+  A:
+    child_target_tokens: 300
+    child_maximum_tokens: 420
+    overlap_tokens: 50
+  B:
+    child_target_tokens: 420
+    child_maximum_tokens: 560
+    overlap_tokens: 70
+  C:
+    child_target_tokens: 550
+    child_maximum_tokens: 700
+    overlap_tokens: 90
+
+selection_status: pending_human_evidence_review

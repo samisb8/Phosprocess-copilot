@@ -1,0 +1,42 @@
+{
+  "validated_at_utc": "2026-07-25T13:54:51.167933+00:00",
+  "status": "valid",
+  "dataset": {
+    "name": "phosprocess_retrieval",
+    "version": "0.1",
+    "directory": "C:\\Users\\USER\\Desktop\\phosprocess-copilot\\data\\evaluation\\retrieval\\v0.1"
+  },
+  "counts": {
+    "queries": 48,
+    "answerable": 40,
+    "unanswerable": 8,
+    "judgments": 0,
+    "judged_queries": 0,
+    "splits": {
+      "dev": 20,
+      "test": 28
+    },
+    "categories": {
+      "exact_numeric": 8,
+      "causal_mechanism": 8,
+      "process_description": 6,
+      "operator_diagnosis": 6,
+      "process_comparison": 4,
+      "table_data": 4,
+      "impurities_losses_corrosion": 4,
+      "unanswerable": 8
+    },
+    "languages": {
+      "fr": 34,
+      "en": 10,
+      "mixed": 4
+    },
+    "difficulties": {
+      "medium": 20,
+      "hard": 19,
+      "easy": 9
+    }
+  },
+  "errors": [],
+  "warnings": []
+}

@@ -18,7 +18,10 @@ from phosprocess.retrieval.context_expander import (
     ContextExpansionConfig,
     EvidenceAnchor,
 )
-from phosprocess.retrieval.domain_router import route_query
+from phosprocess.retrieval.domain_router import (
+    requests_automatic_source_scope,
+    route_query,
+)
 from phosprocess.retrieval.query_expansion import expand_technical_query
 from phosprocess.retrieval.source_boosting import apply_soft_boosts
 
@@ -321,3 +324,149 @@ def test_large_process_anchor_receives_partial_neighbor_context() -> None:
     assert len(bundle.expanded_chunk_ids) >= 2
     assert bundle.context_token_count > 0
     assert bundle.token_count <= 650
+
+
+def test_explicit_becker_wording_hard_filters_only_becker() -> None:
+    decision = route_query(
+        "Cest quoi un évaporateur à circulation forcée ? Cherche sur Becker.",
+        catalog=load_document_catalog(),
+        question_type="definition",
+    )
+
+    assert decision.source_mode == "becker"
+    assert decision.hard_filter == frozenset(
+        {"becker_phosphates_and_phosphoric_acid"}
+    )
+
+
+def test_ocp_context_is_soft_not_an_implicit_hard_filter() -> None:
+    decision = route_query(
+        "Établis le bilan thermique de l'échelon J de JFC4.",
+        catalog=load_document_catalog(),
+        question_type="balance",
+    )
+
+    assert decision.hard_filter is None
+    assert decision.preferred_documents[0] == (
+        "ocp_phosphoric_acid_workshop_report"
+    )
+    assert "smith_van_ness_chemical_engineering_thermodynamics" in (
+        decision.preferred_documents
+    )
+
+
+def test_ocp_report_is_routed_for_multiple_internal_technical_domains() -> None:
+    catalog = load_document_catalog()
+    report = next(
+        document
+        for document in catalog.documents
+        if document.document_id == "ocp_phosphoric_acid_workshop_report"
+    )
+
+    assert {
+        KnowledgeDomain.PHOSPHORIC_ACID_PROCESS,
+        KnowledgeDomain.GENERAL_CHEMICAL_ENGINEERING,
+        KnowledgeDomain.THERMODYNAMICS,
+        KnowledgeDomain.HEAT_TRANSFER,
+        KnowledgeDomain.MASS_TRANSFER,
+        KnowledgeDomain.FLUID_MECHANICS,
+    }.issubset(set(report.domains))
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Établis le bilan de P2O5 de l'échelon J de JFC4.",
+        "Analyse l'encrassement de l'échangeur de l'atelier OCP JFC4.",
+        "Quelle est la capacité évaporatoire réelle de l'échelon J ?",
+    ],
+)
+def test_plant_specific_technical_questions_prioritize_ocp_report(
+    question: str,
+) -> None:
+    decision = route_query(question, catalog=load_document_catalog())
+
+    assert decision.hard_filter is None
+    assert decision.preferred_documents[0] == (
+        "ocp_phosphoric_acid_workshop_report"
+    )
+
+
+def test_explicit_report_wording_hard_filters_ocp_report() -> None:
+    decision = route_query(
+        "Cherche dans le rapport le bilan thermique de l'échelon J.",
+        catalog=load_document_catalog(),
+    )
+
+    assert decision.source_mode == "report"
+    assert decision.hard_filter == frozenset(
+        {"ocp_phosphoric_acid_workshop_report"}
+    )
+    assert "bilan thermique" in decision.section_affinity_terms
+
+
+def test_mass_transfer_diffusion_prioritizes_bird() -> None:
+    decision = route_query(
+        "Explique la diffusion et le transfert de masse dans un fluide.",
+        catalog=load_document_catalog(),
+    )
+
+    assert decision.preferred_documents[0] == "bird_transport_phenomena"
+
+
+def test_kern_seaton_request_targets_report_fouling_section() -> None:
+    decision = route_query(
+        "Explique le modèle Kern and Seaton dans le rapport OCP.",
+        catalog=load_document_catalog(),
+    )
+
+    assert decision.source_mode == "report"
+    assert "resistance d encrassement" in decision.section_affinity_terms
+
+
+def test_momentum_diffusion_routes_to_bird_not_mass_transfer() -> None:
+    decision = route_query(
+        "Explain momentum diffusion in a fluid according to Bird.",
+        catalog=load_document_catalog(),
+        question_type="momentum_diffusion",
+    )
+
+    domains = {domain for domain, _score in decision.detected_domains}
+    assert decision.preferred_documents[0] == "bird_transport_phenomena"
+    assert KnowledgeDomain.FLUID_MECHANICS in domains
+    assert KnowledgeDomain.MASS_TRANSFER not in domains
+    assert "newton s law of viscosity" in decision.section_affinity_terms
+
+
+def test_jfc4_p2o5_balance_has_report_section_hints() -> None:
+    decision = route_query(
+        "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP.",
+        catalog=load_document_catalog(),
+        source_mode="report",
+        question_type="balance",
+    )
+
+    assert decision.hard_filter == frozenset(
+        {"ocp_phosphoric_acid_workshop_report"}
+    )
+    assert "ligne 6 sortie bouilleur" in decision.section_affinity_terms
+    assert "p2o5 entraine" in decision.section_affinity_terms
+
+
+def test_user_can_explicitly_release_a_source_lock() -> None:
+    assert requests_automatic_source_scope(
+        "Cherche maintenant dans toutes les sources."
+    )
+    assert requests_automatic_source_scope("Use all sources for this question.")
+    assert not requests_automatic_source_scope("Cherche uniquement dans Becker.")
+
+
+def test_momentum_query_expansion_uses_bird_vocabulary() -> None:
+    result = expand_technical_query(
+        "Explique la diffusion de quantité de mouvement dans un fluide.",
+        question_type="momentum_diffusion",
+    )
+
+    assert "molecular transport of momentum" in result.added_terms
+    assert "Newton law of viscosity" in result.added_terms
+    assert "concentration gradient" not in result.bm25_expanded_query

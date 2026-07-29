@@ -1,0 +1,838 @@
+{
+  "created_at_utc": "2026-07-27T08:44:41.483620+00:00",
+  "scope": "domain_quality_dev_only",
+  "historical_test_used": false,
+  "question_count": 50,
+  "language_counts": {
+    "fr": 43,
+    "en": 5,
+    "ar": 2
+  },
+  "category_counts": {
+    "phosphoric_acid": 11,
+    "definition": 3,
+    "heat_transfer": 8,
+    "process_flow": 3,
+    "conversation": 13,
+    "explanation": 11,
+    "crystallization": 8,
+    "comparison": 7,
+    "troubleshooting": 4,
+    "thermodynamics": 7,
+    "thermodynamic_relation": 1,
+    "equation": 8,
+    "multilingual": 7,
+    "transport_fluids": 6,
+    "procedure": 1,
+    "control_mpc": 7,
+    "control_strategy": 2,
+    "plant_specific": 3,
+    "atelier": 6,
+    "insufficient": 1
+  },
+  "conversation_question_count": 13,
+  "unanswerable_count": 1,
+  "diagnostics": [
+    {
+      "question_id": "DQ001",
+      "language": "fr",
+      "question_type": "definition",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "forced-circulation evaporator"
+      ]
+    },
+    {
+      "question_id": "DQ002",
+      "language": "fr",
+      "question_type": "process_flow",
+      "detected_domains": [
+        "equipment",
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "phosphoric acid"
+      ]
+    },
+    {
+      "question_id": "DQ003",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "fluid_mechanics"
+      ],
+      "preferred_documents": [
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ004",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "phosphoric acid"
+      ]
+    },
+    {
+      "question_id": "DQ005",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ006",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ007",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "gypsum",
+        "calcium sulfate"
+      ]
+    },
+    {
+      "question_id": "DQ008",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ009",
+      "language": "fr",
+      "question_type": "comparison",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ010",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ011",
+      "language": "fr",
+      "question_type": "thermodynamic_relation",
+      "detected_domains": [
+        "heat_transfer"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ012",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ013",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ014",
+      "language": "en",
+      "question_type": "comparison",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ015",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "thermodynamics"
+      ],
+      "preferred_documents": [
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "enthalpy"
+      ]
+    },
+    {
+      "question_id": "DQ016",
+      "language": "fr",
+      "question_type": "definition",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "latent heat"
+      ]
+    },
+    {
+      "question_id": "DQ017",
+      "language": "fr",
+      "question_type": "equation_explanation",
+      "detected_domains": [
+        "thermodynamics"
+      ],
+      "preferred_documents": [
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "vapor pressure"
+      ]
+    },
+    {
+      "question_id": "DQ018",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment",
+        "heat_transfer"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "bird_transport_phenomena"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "heat exchanger"
+      ]
+    },
+    {
+      "question_id": "DQ019",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ020",
+      "language": "en",
+      "question_type": "definition",
+      "detected_domains": [
+        "equipment",
+        "heat_transfer"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "bird_transport_phenomena"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ021",
+      "language": "en",
+      "question_type": "troubleshooting",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ022",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "heat_transfer"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "heat transfer",
+        "overall heat-transfer coefficient"
+      ]
+    },
+    {
+      "question_id": "DQ023",
+      "language": "fr",
+      "question_type": "comparison",
+      "detected_domains": [
+        "heat_transfer",
+        "equipment"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook",
+        "bird_transport_phenomena",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ024",
+      "language": "fr",
+      "question_type": "troubleshooting",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ025",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment",
+        "fluid_mechanics"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "bird_transport_phenomena",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "circulation pump"
+      ]
+    },
+    {
+      "question_id": "DQ026",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "fluid_mechanics"
+      ],
+      "preferred_documents": [
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "flow rate",
+        "pressure drop"
+      ]
+    },
+    {
+      "question_id": "DQ027",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ028",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "fluid_mechanics"
+      ],
+      "preferred_documents": [
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ029",
+      "language": "en",
+      "question_type": "explanation",
+      "detected_domains": [
+        "fluid_mechanics"
+      ],
+      "preferred_documents": [
+        "bird_transport_phenomena",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ030",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "mass_transfer"
+      ],
+      "preferred_documents": [
+        "bird_transport_phenomena",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ031",
+      "language": "fr",
+      "question_type": "definition",
+      "detected_domains": [
+        "crystallization"
+      ],
+      "preferred_documents": [
+        "mullin_crystallization",
+        "becker_phosphates_and_phosphoric_acid"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "supersaturation"
+      ]
+    },
+    {
+      "question_id": "DQ032",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "crystallization"
+      ],
+      "preferred_documents": [
+        "mullin_crystallization",
+        "becker_phosphates_and_phosphoric_acid"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "supersaturation",
+        "nucleation"
+      ]
+    },
+    {
+      "question_id": "DQ033",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "crystallization",
+        "phosphoric_acid_process"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "mullin_crystallization",
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "gypsum",
+        "calcium sulfate"
+      ]
+    },
+    {
+      "question_id": "DQ034",
+      "language": "fr",
+      "question_type": "comparison",
+      "detected_domains": [
+        "crystallization"
+      ],
+      "preferred_documents": [
+        "mullin_crystallization",
+        "becker_phosphates_and_phosphoric_acid"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "nucleation"
+      ]
+    },
+    {
+      "question_id": "DQ035",
+      "language": "fr",
+      "question_type": "control_strategy",
+      "detected_domains": [
+        "crystallization"
+      ],
+      "preferred_documents": [
+        "mullin_crystallization",
+        "becker_phosphates_and_phosphoric_acid"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "crystal growth"
+      ]
+    },
+    {
+      "question_id": "DQ036",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ037",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ038",
+      "language": "fr",
+      "question_type": "control_strategy",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ039",
+      "language": "fr",
+      "question_type": "control_strategy",
+      "detected_domains": [
+        "equipment",
+        "mpc"
+      ],
+      "preferred_documents": [
+        "seborg_process_dynamics_control",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ040",
+      "language": "fr",
+      "question_type": "control_strategy",
+      "detected_domains": [
+        "process_control"
+      ],
+      "preferred_documents": [
+        "seborg_process_dynamics_control"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "process control"
+      ]
+    },
+    {
+      "question_id": "DQ041",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "process_control"
+      ],
+      "preferred_documents": [
+        "seborg_process_dynamics_control"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ042",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "flow rate"
+      ]
+    },
+    {
+      "question_id": "DQ043",
+      "language": "en",
+      "question_type": "control_strategy",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ044",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ045",
+      "language": "fr",
+      "question_type": "plant_specific",
+      "detected_domains": [
+        "plant_specific",
+        "equipment"
+      ],
+      "preferred_documents": [
+        "ocp_phosphoric_acid_workshop_report",
+        "becker_phosphates_and_phosphoric_acid",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ046",
+      "language": "fr",
+      "question_type": "process_flow",
+      "detected_domains": [
+        "plant_specific"
+      ],
+      "preferred_documents": [
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ047",
+      "language": "fr",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment"
+      ],
+      "preferred_documents": [
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    },
+    {
+      "question_id": "DQ048",
+      "language": "ar",
+      "question_type": "explanation",
+      "detected_domains": [
+        "equipment",
+        "heat_transfer"
+      ],
+      "preferred_documents": [
+        "incropera_fundamentals_heat_mass_transfer",
+        "perrys_chemical_engineers_handbook",
+        "becker_phosphates_and_phosphoric_acid",
+        "ocp_phosphoric_acid_workshop_report",
+        "bird_transport_phenomena"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "evaporator",
+        "heat exchanger"
+      ]
+    },
+    {
+      "question_id": "DQ049",
+      "language": "ar",
+      "question_type": "explanation",
+      "detected_domains": [
+        "general_chemical_engineering"
+      ],
+      "preferred_documents": [
+        "perrys_chemical_engineers_handbook",
+        "mullin_crystallization",
+        "smith_van_ness_chemical_engineering_thermodynamics"
+      ],
+      "hard_filter": null,
+      "added_terms": [
+        "fouling"
+      ]
+    },
+    {
+      "question_id": "DQ050",
+      "language": "fr",
+      "question_type": "plant_specific",
+      "detected_domains": [
+        "plant_specific"
+      ],
+      "preferred_documents": [
+        "ocp_phosphoric_acid_workshop_report"
+      ],
+      "hard_filter": null,
+      "added_terms": []
+    }
+  ]
+}

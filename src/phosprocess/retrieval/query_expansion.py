@@ -52,6 +52,14 @@ _INTENT_EQUIVALENTS: dict[str, tuple[str, ...]] = {
         "fouling scaling",
         "performance loss",
     ),
+    "momentum_diffusion": (
+        "molecular transport of momentum",
+        "momentum flux",
+        "velocity gradient",
+        "shear stress",
+        "Newton law of viscosity",
+        "dynamic viscosity",
+    ),
 }
 
 # Dense retrieval benefits from a concise and balanced semantic hint. BM25 still
@@ -66,6 +74,11 @@ _DENSE_INTENT_HINTS: dict[str, tuple[str, ...]] = {
         "circulation pump heat exchanger",
         "flash chamber recirculation",
         "concentrated acid withdrawal",
+    ),
+    "momentum_diffusion": (
+        "molecular transport of momentum",
+        "momentum flux velocity gradient",
+        "Newton law of viscosity",
     ),
 }
 
