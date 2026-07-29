@@ -10,6 +10,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
+from phosprocess.api.database_dependencies import (
+    get_chat_persistence_service,
+)
 from phosprocess.api.dependencies import (
     RAGService,
     get_rag_inference_lock,
@@ -21,6 +24,13 @@ from phosprocess.api.schemas.chat import (
     ChatResponse,
     ChatSourceResponse,
     ChatTimingsResponse,
+)
+from phosprocess.database.repositories.chat_repository import (
+    ChatSessionNotFoundError,
+)
+from phosprocess.database.services.chat_persistence import (
+    ChatPersistenceService,
+    PersistedChatExchange,
 )
 from phosprocess.rag.schemas import RAGResponse, RAGSource
 
@@ -52,10 +62,16 @@ def _map_source(source: RAGSource) -> ChatSourceResponse:
     )
 
 
-def _map_response(response: RAGResponse) -> ChatResponse:
-    """Convert the internal RAG contract to the public API contract."""
+def _map_response(
+    response: RAGResponse,
+    persisted: PersistedChatExchange,
+) -> ChatResponse:
+    """Convert the internal RAG and persistence results to the API."""
 
     return ChatResponse(
+        session_id=persisted.session_id,
+        user_message_id=persisted.user_message_id,
+        assistant_message_id=persisted.assistant_message_id,
         question=response.question,
         answer=response.answer,
         sources=[
@@ -98,11 +114,16 @@ def _map_response(response: RAGResponse) -> ChatResponse:
         status.HTTP_400_BAD_REQUEST: {
             "description": "Invalid RAG execution option.",
         },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The requested chat session does not exist.",
+        },
         status.HTTP_503_SERVICE_UNAVAILABLE: {
-            "description": "The RAG service is not ready.",
+            "description": "The RAG or database service is not ready.",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "description": "The RAG request failed.",
+            "description": (
+                "The RAG execution or persistence transaction failed."
+            ),
         },
     },
     summary="Ask a grounded technical question",
@@ -117,8 +138,12 @@ async def chat(
         Lock,
         Depends(get_rag_inference_lock),
     ],
+    persistence_service: Annotated[
+        ChatPersistenceService,
+        Depends(get_chat_persistence_service),
+    ],
 ) -> ChatResponse:
-    """Run one serialized RAG request without blocking FastAPI."""
+    """Run the RAG and persist its complete exchange."""
 
     try:
         async with inference_lock:
@@ -142,4 +167,28 @@ async def chat(
             detail="The RAG request could not be completed.",
         ) from exception
 
-    return _map_response(rag_response)
+    try:
+        persistence_operation = partial(
+            persistence_service.persist_exchange,
+            response=rag_response,
+            session_id=payload.session_id,
+        )
+        persisted = await run_in_threadpool(
+            persistence_operation
+        )
+    except ChatSessionNotFoundError as exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exception),
+        ) from exception
+    except Exception as exception:
+        LOGGER.exception(
+            "The RAG exchange could not be persisted."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The chat exchange could not be persisted.",
+        ) from exception
+
+    return _map_response(rag_response, persisted)

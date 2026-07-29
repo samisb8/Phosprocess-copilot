@@ -26,6 +26,7 @@ from phosprocess.api.routes.chat import router as chat_router
 from phosprocess.api.routes.health import router as health_router
 from phosprocess.api.routes.readiness import router as readiness_router
 from phosprocess.database.health import check_database_connection
+from phosprocess.database.session import create_session_factory
 
 LOGGER = logging.getLogger(__name__)
 
@@ -88,6 +89,9 @@ def create_app(
 
             database_runtime = DatabaseRuntimeState(
                 engine=database_engine,
+                session_factory=create_session_factory(
+                    database_engine
+                ),
                 ready=True,
                 health=database_health,
             )
@@ -99,6 +103,7 @@ def create_app(
 
             database_runtime = DatabaseRuntimeState(
                 engine=None,
+                session_factory=None,
                 ready=False,
                 health=None,
                 startup_error=(

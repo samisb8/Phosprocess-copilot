@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -14,6 +16,13 @@ class ChatRequest(BaseModel):
         min_length=1,
         max_length=4_000,
         description="Technical question sent to PhosProcess Copilot.",
+    )
+    session_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Existing conversation identifier. "
+            "Omit it to create a new conversation."
+        ),
     )
     source_mode: str = Field(
         default="automatic",
@@ -91,6 +100,10 @@ class ChatResponse(BaseModel):
     """Stable public API response built from the internal RAG response."""
 
     model_config = ConfigDict(frozen=True)
+
+    session_id: UUID
+    user_message_id: UUID
+    assistant_message_id: UUID
 
     question: str
     answer: str

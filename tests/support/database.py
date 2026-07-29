@@ -1,14 +1,30 @@
 """Lightweight database dependencies used by API tests."""
 
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.pool import StaticPool
 
+from phosprocess.database import models as database_models
+from phosprocess.database.base import Base
 from phosprocess.database.health import DatabaseHealth
 
 
 def build_test_database_engine() -> Engine:
-    """Create a local in-memory engine without network access."""
+    """Create a shared in-memory database with the ORM schema."""
 
-    return create_engine("sqlite+pysqlite:///:memory:")
+    # Accessing the module ensures every ORM table is registered.
+    _ = database_models
+
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={
+            "check_same_thread": False,
+        },
+        poolclass=StaticPool,
+    )
+
+    Base.metadata.create_all(engine)
+
+    return engine
 
 
 def check_test_database_connection(

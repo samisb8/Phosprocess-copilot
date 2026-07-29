@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, func, select
 
+from phosprocess.api.database_dependencies import (
+    DatabaseRuntimeState,
+)
 from phosprocess.api.main import create_app
+from phosprocess.database.models import (
+    ChatMessage,
+    ChatSession,
+    MessageCitation,
+)
 from phosprocess.rag.schemas import (
     RAGResponse,
     RAGSource,
@@ -110,7 +120,7 @@ class _FakeChatRAGService:
 
 
 def test_chat_returns_public_rag_response() -> None:
-    """The endpoint should map the internal RAG response to JSON."""
+    """The endpoint should persist and expose one complete exchange."""
 
     service = _FakeChatRAGService()
     application = create_app(
@@ -130,9 +140,52 @@ def test_chat_returns_public_rag_response() -> None:
             },
         )
 
-    assert response.status_code == 200
+        assert response.status_code == 200
 
-    body = response.json()
+        body = response.json()
+
+        session_id = UUID(body["session_id"])
+        user_message_id = UUID(body["user_message_id"])
+        assistant_message_id = UUID(
+            body["assistant_message_id"]
+        )
+
+        runtime = cast(
+            DatabaseRuntimeState,
+            application.state.database_runtime,
+        )
+        assert runtime.session_factory is not None
+
+        with runtime.session_factory() as database_session:
+            chat_session = database_session.get(
+                ChatSession,
+                session_id,
+            )
+            user_message = database_session.get(
+                ChatMessage,
+                user_message_id,
+            )
+            assistant_message = database_session.get(
+                ChatMessage,
+                assistant_message_id,
+            )
+            citation_count = database_session.scalar(
+                select(func.count())
+                .select_from(MessageCitation)
+                .where(
+                    MessageCitation.message_id
+                    == assistant_message_id
+                )
+            )
+            cited_count = database_session.scalar(
+                select(func.count())
+                .select_from(MessageCitation)
+                .where(
+                    MessageCitation.message_id
+                    == assistant_message_id,
+                    MessageCitation.is_cited.is_(True),
+                )
+            )
 
     assert body["question"] == "Quel est le r?le de la pompe ?"
     assert body["insufficient_context"] is False
@@ -143,6 +196,20 @@ def test_chat_returns_public_rag_response() -> None:
     assert body["source_policy"]["primary"] == "becker"
     assert body["timings"]["total_ms"] == 1_800.0
 
+    assert chat_session is not None
+    assert chat_session.title == "Quel est le r?le de la pompe ?"
+
+    assert user_message is not None
+    assert user_message.role == "user"
+    assert user_message.content == "Quel est le r?le de la pompe ?"
+
+    assert assistant_message is not None
+    assert assistant_message.role == "assistant"
+    assert assistant_message.model_name == "qwen3:8b"
+
+    assert citation_count == 5
+    assert cited_count == 1
+
     assert service.answer_calls == [
         (
             "Quel est le r?le de la pompe ?",
@@ -150,6 +217,157 @@ def test_chat_returns_public_rag_response() -> None:
             "auto",
         )
     ]
+
+
+def test_chat_appends_to_an_existing_session() -> None:
+    """A returned session identifier should continue the conversation."""
+
+    service = _FakeChatRAGService()
+    application = create_app(
+        service_factory=lambda: service,
+        warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
+    )
+
+    with TestClient(application) as client:
+        first_response = client.post(
+            "/api/v1/chat",
+            json={"question": "Premi?re question"},
+        )
+        assert first_response.status_code == 200
+        first_body = first_response.json()
+
+        second_response = client.post(
+            "/api/v1/chat",
+            json={
+                "question": "Deuxi?me question",
+                "session_id": first_body["session_id"],
+            },
+        )
+        assert second_response.status_code == 200
+        second_body = second_response.json()
+
+        session_id = UUID(first_body["session_id"])
+
+        runtime = cast(
+            DatabaseRuntimeState,
+            application.state.database_runtime,
+        )
+        assert runtime.session_factory is not None
+
+        with runtime.session_factory() as database_session:
+            session_count = database_session.scalar(
+                select(func.count())
+                .select_from(ChatSession)
+            )
+            message_count = database_session.scalar(
+                select(func.count())
+                .select_from(ChatMessage)
+                .where(ChatMessage.session_id == session_id)
+            )
+            citation_count = database_session.scalar(
+                select(func.count())
+                .select_from(MessageCitation)
+                .join(ChatMessage)
+                .where(ChatMessage.session_id == session_id)
+            )
+            chat_session = database_session.get(
+                ChatSession,
+                session_id,
+            )
+
+    assert second_body["session_id"] == first_body["session_id"]
+    assert (
+        second_body["user_message_id"]
+        != first_body["user_message_id"]
+    )
+    assert (
+        second_body["assistant_message_id"]
+        != first_body["assistant_message_id"]
+    )
+
+    assert session_count == 1
+    assert message_count == 4
+    assert citation_count == 10
+
+    assert chat_session is not None
+    assert chat_session.title == "Premi?re question"
+
+
+def test_chat_returns_404_for_unknown_session() -> None:
+    """An unknown session identifier should not create partial data."""
+
+    service = _FakeChatRAGService()
+    application = create_app(
+        service_factory=lambda: service,
+        warmup_enabled=False,
+        database_engine_factory=build_test_database_engine,
+        database_health_check=check_test_database_connection,
+    )
+    unknown_session_id = uuid4()
+
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "question": "Question technique",
+                "session_id": str(unknown_session_id),
+            },
+        )
+
+        runtime = cast(
+            DatabaseRuntimeState,
+            application.state.database_runtime,
+        )
+        assert runtime.session_factory is not None
+
+        with runtime.session_factory() as database_session:
+            session_count = database_session.scalar(
+                select(func.count())
+                .select_from(ChatSession)
+            )
+            message_count = database_session.scalar(
+                select(func.count())
+                .select_from(ChatMessage)
+            )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": (
+            f"Chat session '{unknown_session_id}' was not found."
+        )
+    }
+    assert session_count == 0
+    assert message_count == 0
+
+
+def test_chat_returns_503_when_database_is_unavailable() -> None:
+    """Chat persistence requires a ready database service."""
+
+    service = _FakeChatRAGService()
+
+    def failing_database_factory() -> Engine:
+        raise RuntimeError("Simulated database startup failure")
+
+    application = create_app(
+        service_factory=lambda: service,
+        warmup_enabled=False,
+        database_engine_factory=failing_database_factory,
+        database_health_check=check_test_database_connection,
+    )
+
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={"question": "Question technique"},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Database service is not ready."
+    }
+    assert service.answer_calls == []
 
 
 def test_chat_rejects_an_empty_question() -> None:
