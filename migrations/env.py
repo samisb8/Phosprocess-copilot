@@ -7,6 +7,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import Connection
 
+# Import for side effects: register ORM models in Base.metadata.
+from phosprocess.database import (
+    models as _models,  # noqa: F401
+)
 from phosprocess.database.base import Base
 from phosprocess.database.engine import create_database_engine
 from phosprocess.database.settings import get_database_settings
