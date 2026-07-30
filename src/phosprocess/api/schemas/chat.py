@@ -73,6 +73,31 @@ class ChatSourceResponse(BaseModel):
     chunk_type: str | None = None
 
 
+class ChatSessionSummaryResponse(BaseModel):
+    """Compact representation of one persisted conversation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    session_id: UUID
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = Field(ge=0)
+
+
+class ChatSessionListResponse(BaseModel):
+    """Paginated list of persisted conversations."""
+
+    model_config = ConfigDict(frozen=True)
+
+    items: list[ChatSessionSummaryResponse] = Field(
+        default_factory=list
+    )
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0)
+
+
 class ChatHistoryCitationResponse(BaseModel):
     """Citation persisted with one historical assistant message."""
 

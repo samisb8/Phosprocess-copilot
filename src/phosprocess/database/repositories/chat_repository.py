@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from phosprocess.database.models import (
@@ -12,6 +13,14 @@ from phosprocess.database.models import (
     ChatSession,
     MessageCitation,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ChatSessionSummaryRecord:
+    """Database result used to summarize one conversation."""
+
+    chat_session: ChatSession
+    message_count: int
 
 
 class ChatSessionNotFoundError(LookupError):
@@ -85,6 +94,48 @@ class ChatRepository:
             raise ChatSessionNotFoundError(session_id)
 
         return chat_session
+
+    def count_sessions(self) -> int:
+        """Return the total number of persisted conversations."""
+
+        total = self._database_session.scalar(
+            select(func.count()).select_from(ChatSession)
+        )
+
+        return int(total or 0)
+
+    def list_session_summaries(
+        self,
+        *,
+        limit: int,
+        offset: int,
+    ) -> list[ChatSessionSummaryRecord]:
+        """Return one ordered and paginated conversation page."""
+
+        statement = (
+            select(
+                ChatSession,
+                func.count(ChatMessage.id),
+            )
+            .outerjoin(ChatSession.messages)
+            .group_by(ChatSession.id)
+            .order_by(
+                ChatSession.updated_at.desc(),
+                ChatSession.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = self._database_session.execute(statement)
+
+        return [
+            ChatSessionSummaryRecord(
+                chat_session=chat_session,
+                message_count=int(message_count),
+            )
+            for chat_session, message_count in result
+        ]
 
     def add_message(
         self,

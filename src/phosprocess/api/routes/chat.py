@@ -8,12 +8,19 @@ from functools import partial
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from starlette.concurrency import run_in_threadpool
 
 from phosprocess.api.database_dependencies import (
     get_chat_history_service,
     get_chat_persistence_service,
+    get_chat_session_listing_service,
 )
 from phosprocess.api.dependencies import (
     RAGService,
@@ -27,6 +34,8 @@ from phosprocess.api.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ChatSessionHistoryResponse,
+    ChatSessionListResponse,
+    ChatSessionSummaryResponse,
     ChatSourceResponse,
     ChatTimingsResponse,
 )
@@ -42,6 +51,11 @@ from phosprocess.database.services.chat_history import (
 from phosprocess.database.services.chat_persistence import (
     ChatPersistenceService,
     PersistedChatExchange,
+)
+from phosprocess.database.services.chat_session_listing import (
+    ChatSessionListingService,
+    ChatSessionPage,
+    ChatSessionSummary,
 )
 from phosprocess.rag.schemas import RAGResponse, RAGSource
 
@@ -70,6 +84,36 @@ def _map_source(source: RAGSource) -> ChatSourceResponse:
         page_end=source.page_end,
         domain=source.domain,
         chunk_type=source.chunk_type,
+    )
+
+
+def _map_session_summary(
+    summary: ChatSessionSummary,
+) -> ChatSessionSummaryResponse:
+    """Convert one conversation summary to the public API."""
+
+    return ChatSessionSummaryResponse(
+        session_id=summary.session_id,
+        title=summary.title,
+        created_at=summary.created_at,
+        updated_at=summary.updated_at,
+        message_count=summary.message_count,
+    )
+
+
+def _map_session_page(
+    page: ChatSessionPage,
+) -> ChatSessionListResponse:
+    """Convert one paginated result to the public API."""
+
+    return ChatSessionListResponse(
+        items=[
+            _map_session_summary(summary)
+            for summary in page.items
+        ],
+        total=page.total,
+        limit=page.limit,
+        offset=page.offset,
     )
 
 
@@ -179,6 +223,56 @@ def _map_response(
             first_token_ms=response.timings.first_token_ms,
         ),
     )
+
+
+@router.get(
+    "/chat/sessions",
+    response_model=ChatSessionListResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "The database service is not ready.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "The conversations could not be listed.",
+        },
+    },
+    summary="List persisted chat conversations",
+)
+async def list_chat_sessions(
+    listing_service: Annotated[
+        ChatSessionListingService,
+        Depends(get_chat_session_listing_service),
+    ],
+    limit: Annotated[
+        int,
+        Query(ge=1, le=100),
+    ] = 20,
+    offset: Annotated[
+        int,
+        Query(ge=0),
+    ] = 0,
+) -> ChatSessionListResponse:
+    """Return conversations ordered by latest activity."""
+
+    try:
+        operation = partial(
+            listing_service.list_sessions,
+            limit=limit,
+            offset=offset,
+        )
+        page = await run_in_threadpool(operation)
+    except Exception as exception:
+        LOGGER.exception(
+            "The chat sessions could not be listed."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The chat sessions could not be listed.",
+        ) from exception
+
+    return _map_session_page(page)
 
 
 @router.get(

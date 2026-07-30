@@ -18,6 +18,9 @@ from phosprocess.database.services.chat_history import (
 from phosprocess.database.services.chat_persistence import (
     ChatPersistenceService,
 )
+from phosprocess.database.services.chat_session_listing import (
+    ChatSessionListingService,
+)
 
 DatabaseEngineFactory = Callable[[], Engine]
 DatabaseHealthCheck = Callable[[Engine], DatabaseHealth]
@@ -91,6 +94,16 @@ def get_database_session_factory(
         )
 
     return runtime_state.session_factory
+
+
+def get_chat_session_listing_service(
+    request: Request,
+) -> ChatSessionListingService:
+    """Build the paginated conversation-listing service."""
+
+    return ChatSessionListingService(
+        get_database_session_factory(request)
+    )
 
 
 def get_chat_history_service(
