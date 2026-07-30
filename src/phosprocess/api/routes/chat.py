@@ -13,6 +13,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Response,
     status,
 )
 from starlette.concurrency import run_in_threadpool
@@ -21,6 +22,7 @@ from phosprocess.api.database_dependencies import (
     get_chat_history_service,
     get_chat_persistence_service,
     get_chat_session_listing_service,
+    get_chat_session_management_service,
 )
 from phosprocess.api.dependencies import (
     RAGService,
@@ -35,6 +37,8 @@ from phosprocess.api.schemas.chat import (
     ChatResponse,
     ChatSessionHistoryResponse,
     ChatSessionListResponse,
+    ChatSessionRenameRequest,
+    ChatSessionRenameResponse,
     ChatSessionSummaryResponse,
     ChatSourceResponse,
     ChatTimingsResponse,
@@ -56,6 +60,10 @@ from phosprocess.database.services.chat_session_listing import (
     ChatSessionListingService,
     ChatSessionPage,
     ChatSessionSummary,
+)
+from phosprocess.database.services.chat_session_management import (
+    ChatSessionManagementService,
+    RenamedChatSession,
 )
 from phosprocess.rag.schemas import RAGResponse, RAGSource
 
@@ -84,6 +92,18 @@ def _map_source(source: RAGSource) -> ChatSourceResponse:
         page_end=source.page_end,
         domain=source.domain,
         chunk_type=source.chunk_type,
+    )
+
+
+def _map_renamed_session(
+    session: RenamedChatSession,
+) -> ChatSessionRenameResponse:
+    """Convert a renamed conversation to the public API."""
+
+    return ChatSessionRenameResponse(
+        session_id=session.session_id,
+        title=session.title,
+        updated_at=session.updated_at,
     )
 
 
@@ -273,6 +293,118 @@ async def list_chat_sessions(
         ) from exception
 
     return _map_session_page(page)
+
+
+@router.patch(
+    "/chat/sessions/{session_id}",
+    response_model=ChatSessionRenameResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "The new title is invalid.",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The requested chat session does not exist.",
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "The database service is not ready.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "The conversation could not be renamed.",
+        },
+    },
+    summary="Rename a persisted chat conversation",
+)
+async def rename_chat_session(
+    session_id: UUID,
+    payload: ChatSessionRenameRequest,
+    management_service: Annotated[
+        ChatSessionManagementService,
+        Depends(get_chat_session_management_service),
+    ],
+) -> ChatSessionRenameResponse:
+    """Rename one persisted conversation."""
+
+    try:
+        operation = partial(
+            management_service.rename_session,
+            session_id,
+            title=payload.title,
+        )
+        renamed_session = await run_in_threadpool(operation)
+    except ChatSessionNotFoundError as exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exception),
+        ) from exception
+    except ValueError as exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exception),
+        ) from exception
+    except Exception as exception:
+        LOGGER.exception(
+            "The chat session could not be renamed."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The chat session could not be renamed.",
+        ) from exception
+
+    return _map_renamed_session(renamed_session)
+
+
+@router.delete(
+    "/chat/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The requested chat session does not exist.",
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "The database service is not ready.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "The conversation could not be deleted.",
+        },
+    },
+    summary="Delete a persisted chat conversation",
+)
+async def delete_chat_session(
+    session_id: UUID,
+    management_service: Annotated[
+        ChatSessionManagementService,
+        Depends(get_chat_session_management_service),
+    ],
+) -> Response:
+    """Delete one conversation and its dependent records."""
+
+    try:
+        operation = partial(
+            management_service.delete_session,
+            session_id,
+        )
+        await run_in_threadpool(operation)
+    except ChatSessionNotFoundError as exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exception),
+        ) from exception
+    except Exception as exception:
+        LOGGER.exception(
+            "The chat session could not be deleted."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The chat session could not be deleted.",
+        ) from exception
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
+    )
 
 
 @router.get(

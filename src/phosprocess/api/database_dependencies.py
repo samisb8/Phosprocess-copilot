@@ -21,6 +21,9 @@ from phosprocess.database.services.chat_persistence import (
 from phosprocess.database.services.chat_session_listing import (
     ChatSessionListingService,
 )
+from phosprocess.database.services.chat_session_management import (
+    ChatSessionManagementService,
+)
 
 DatabaseEngineFactory = Callable[[], Engine]
 DatabaseHealthCheck = Callable[[Engine], DatabaseHealth]
@@ -94,6 +97,16 @@ def get_database_session_factory(
         )
 
     return runtime_state.session_factory
+
+
+def get_chat_session_management_service(
+    request: Request,
+) -> ChatSessionManagementService:
+    """Build the transactional session-management service."""
+
+    return ChatSessionManagementService(
+        get_database_session_factory(request)
+    )
 
 
 def get_chat_session_listing_service(

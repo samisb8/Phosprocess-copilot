@@ -73,6 +73,41 @@ class ChatSourceResponse(BaseModel):
     chunk_type: str | None = None
 
 
+class ChatSessionRenameRequest(BaseModel):
+    """New title accepted when renaming a conversation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    @field_validator("title")
+    @classmethod
+    def strip_title(cls, value: str) -> str:
+        """Reject a title containing only spaces."""
+
+        stripped = value.strip()
+
+        if not stripped:
+            raise ValueError(
+                "The chat session title must not be empty."
+            )
+
+        return stripped
+
+
+class ChatSessionRenameResponse(BaseModel):
+    """Conversation metadata returned after a successful rename."""
+
+    model_config = ConfigDict(frozen=True)
+
+    session_id: UUID
+    title: str
+    updated_at: datetime
+
+
 class ChatSessionSummaryResponse(BaseModel):
     """Compact representation of one persisted conversation."""
 
