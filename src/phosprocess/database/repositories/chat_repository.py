@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -136,6 +137,28 @@ class ChatRepository:
             )
             for chat_session, message_count in result
         ]
+
+    def rename_session(
+        self,
+        chat_session: ChatSession,
+        *,
+        title: str,
+        updated_at: datetime,
+    ) -> ChatSession:
+        """Stage a conversation title update."""
+
+        chat_session.title = title
+        chat_session.updated_at = updated_at
+
+        return chat_session
+
+    def delete_session(
+        self,
+        chat_session: ChatSession,
+    ) -> None:
+        """Stage one complete conversation for deletion."""
+
+        self._database_session.delete(chat_session)
 
     def add_message(
         self,
