@@ -1,19 +1,30 @@
-"""Parent and neighbor expansion under a strict global context budget."""
+"""Parent-first evidence reconstruction and dynamic token-budget packing."""
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from phosprocess.ingestion.chunk_serialization import (
     TechnicalChildChunk,
     TechnicalParentChunk,
 )
-from phosprocess.retrieval.evidence_bundle import EvidenceBundle
+from phosprocess.observability.latency import estimate_tokens
+from phosprocess.retrieval.evidence_bundle import (
+    EvidenceBundle,
+    EvidenceContextScope,
+    render_evidence_block,
+)
+
+TokenCounter = Callable[[str], int]
+
+_WHITESPACE = re.compile(r"\s+")
 
 
 @dataclass(frozen=True, slots=True)
 class EvidenceAnchor:
-    """Reranked child selected for contextual expansion."""
+    """Reranked child eligible for documentary context packing."""
 
     child: TechnicalChildChunk
     score: float
@@ -21,34 +32,40 @@ class EvidenceAnchor:
 
 
 @dataclass(frozen=True, slots=True)
-class ContextExpansionConfig:
-    """Initial evidence-window budgets."""
+class ParentCandidate:
+    """All eligible anchors that resolve to one documentary parent."""
 
-    neighbor_window: int = 1
-    include_parent: str = "conditional"
-    max_tokens_per_bundle: int = 650
-    max_total_context_tokens: int = 2600
-    maximum_bundles: int = 5
-    minimum_context_slice_tokens: int = 32
+    parent_id: str
+    anchors: tuple[EvidenceAnchor, ...]
+    best_anchor_score: float
+    selection_provenance: tuple[str, ...]
+    first_anchor_position: int
+
+    @property
+    def anchor_chunk_ids(self) -> tuple[str, ...]:
+        return tuple(anchor.child.chunk_id for anchor in self.anchors)
 
 
 @dataclass(frozen=True, slots=True)
-class _SelectedPiece:
-    child: TechnicalChildChunk
-    text: str
-    token_count: int
-    partial: bool
+class ContextExpansionConfig:
+    """Technical context budgets; bundle cardinality is intentionally dynamic."""
+
+    neighbor_window: int = 1
+    max_tokens_per_bundle: int = 650
+    max_total_context_tokens: int = 2600
+    maximum_bundles: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.neighbor_window < 0:
+            raise ValueError("neighbor_window doit etre positif ou nul.")
+        if self.max_tokens_per_bundle <= 0 or self.max_total_context_tokens <= 0:
+            raise ValueError("Les budgets de contexte doivent etre positifs.")
+        if self.maximum_bundles is not None and self.maximum_bundles <= 0:
+            raise ValueError("maximum_bundles doit etre positif lorsqu'il est defini.")
 
 
 class ContextExpander:
-    """Expand anchors without crossing document boundaries or losing anchors.
-
-    A whole neighboring child often contains 400-560 tokens. With five bundles
-    sharing a 2,600-token budget, the old all-or-nothing policy usually had no
-    room for a neighbor and therefore reported ``context_tokens=0``. This
-    implementation keeps complete neighbors when they fit and otherwise adds a
-    bounded tail/head slice, preserving the most useful local continuity.
-    """
+    """Group anchors by parent, reconstruct faithful context, then pack it."""
 
     def __init__(
         self,
@@ -56,147 +73,354 @@ class ContextExpander:
         children: list[TechnicalChildChunk],
         parents: list[TechnicalParentChunk],
         config: ContextExpansionConfig | None = None,
+        token_counter: TokenCounter | None = None,
     ) -> None:
         self.config = config or ContextExpansionConfig()
+        self.token_counter = token_counter or estimate_tokens
         self.child_by_id = {child.chunk_id: child for child in children}
-        self.child_order = {
-            child.chunk_id: position
-            for position, child in enumerate(children)
-        }
+        self.child_order = {child.chunk_id: position for position, child in enumerate(children)}
         self.parent_by_id = {parent.parent_id: parent for parent in parents}
 
     @staticmethod
-    def _requires_neighbors(question_type: str) -> bool:
-        return question_type in {
-            "process_flow",
-            "procedure",
-            "equation_explanation",
-            "troubleshooting",
-        }
+    def _normalize_documentary_text(text: str) -> str:
+        return _WHITESPACE.sub(" ", text).strip().casefold()
+
+    def group_anchors_by_parent(
+        self,
+        anchors: list[EvidenceAnchor],
+    ) -> list[ParentCandidate]:
+        """Collapse duplicate anchors and create one ranked candidate per parent."""
+
+        grouped: dict[str, list[tuple[int, EvidenceAnchor]]] = {}
+        seen_chunk_ids: set[str] = set()
+        for position, anchor in enumerate(anchors):
+            chunk_id = anchor.child.chunk_id
+            if chunk_id in seen_chunk_ids:
+                continue
+            seen_chunk_ids.add(chunk_id)
+            grouped.setdefault(anchor.child.parent_id, []).append((position, anchor))
+
+        candidates: list[ParentCandidate] = []
+        for parent_id, positioned in grouped.items():
+            ordered = tuple(
+                anchor
+                for _position, anchor in sorted(
+                    positioned,
+                    key=lambda item: (-item[1].score, item[0]),
+                )
+            )
+            provenance = tuple(dict.fromkeys(anchor.provenance for anchor in ordered))
+            candidates.append(
+                ParentCandidate(
+                    parent_id=parent_id,
+                    anchors=ordered,
+                    best_anchor_score=max(anchor.score for anchor in ordered),
+                    selection_provenance=provenance,
+                    first_anchor_position=min(position for position, _anchor in positioned),
+                )
+            )
+
+        return sorted(
+            candidates,
+            key=lambda item: (-item.best_anchor_score, item.first_anchor_position),
+        )
 
     @staticmethod
-    def _requires_parent(question_type: str) -> bool:
-        return question_type in {
-            "process_flow",
-            "procedure",
-            "equation_explanation",
-            "table_question",
-        }
-
-    def _neighbor_ids(
-        self,
+    def _structurally_compatible(
         anchor: TechnicalChildChunk,
-        *,
-        question_type: str,
-    ) -> list[str]:
-        if not self._requires_neighbors(question_type):
-            return [anchor.chunk_id]
+        candidate: TechnicalChildChunk,
+    ) -> bool:
+        """Prevent neighbor expansion across document or hierarchy boundaries."""
 
-        previous_ids: list[str] = []
-        current = anchor
+        if anchor.document_id != candidate.document_id:
+            return False
+        if anchor.section_id and candidate.section_id:
+            return anchor.section_id == candidate.section_id
+        return (
+            anchor.chapter,
+            anchor.section,
+            anchor.subsection,
+            anchor.hierarchy_path,
+        ) == (
+            candidate.chapter,
+            candidate.section,
+            candidate.subsection,
+            candidate.hierarchy_path,
+        )
 
-        for _ in range(self.config.neighbor_window):
-            if not current.previous_chunk_id:
-                break
-
-            previous = self.child_by_id.get(current.previous_chunk_id)
-
-            if previous is None or previous.document_id != anchor.document_id:
-                break
-
-            previous_ids.append(previous.chunk_id)
-            current = previous
-
-        next_ids: list[str] = []
-        current = anchor
-
-        for _ in range(self.config.neighbor_window):
-            if not current.next_chunk_id:
-                break
-
-            following = self.child_by_id.get(current.next_chunk_id)
-
-            if following is None or following.document_id != anchor.document_id:
-                break
-
-            next_ids.append(following.chunk_id)
-            current = following
-
-        return [*reversed(previous_ids), anchor.chunk_id, *next_ids]
-
-    def _candidate_ids(
+    def _parent_children(
         self,
-        anchor: TechnicalChildChunk,
-        *,
-        question_type: str,
-        used_parents: set[str],
-    ) -> tuple[list[str], bool]:
-        ids = self._neighbor_ids(anchor, question_type=question_type)
-        parent_available = False
-
-        if (
-            self.config.include_parent == "conditional"
-            and self._requires_parent(question_type)
-            and anchor.parent_id not in used_parents
-        ):
-            parent = self.parent_by_id.get(anchor.parent_id)
-
-            if parent is not None:
-                ids = list(parent.child_chunk_ids)
-                parent_available = True
-
-        return list(dict.fromkeys(ids)), parent_available
+        candidate: ParentCandidate,
+    ) -> tuple[TechnicalParentChunk | None, list[TechnicalChildChunk]]:
+        parent = self.parent_by_id.get(candidate.parent_id)
+        if parent is None:
+            return None, []
+        primary = candidate.anchors[0].child
+        if parent.document_id != primary.document_id:
+            return None, []
+        children = [
+            child
+            for chunk_id in parent.child_chunk_ids
+            if (child := self.child_by_id.get(chunk_id)) is not None
+            and child.document_id == primary.document_id
+        ]
+        return parent, children
 
     @staticmethod
-    def _slice_context(
-        child: TechnicalChildChunk,
+    def _provenance_priority(candidate: ParentCandidate) -> int:
+        """Break score ties using generic retrieval provenance only."""
+
+        provenance = " ".join(candidate.selection_provenance).casefold()
+        if "evidence_role" in provenance or "role_evidence" in provenance:
+            return 0
+        if "reranker" in provenance:
+            return 1
+        if "bm25" in provenance:
+            return 2
+        return 3
+
+    def _compatible_neighbors(
+        self,
+        anchors: tuple[EvidenceAnchor, ...],
+    ) -> list[TechnicalChildChunk]:
+        neighbors: dict[str, TechnicalChildChunk] = {}
+        for evidence_anchor in anchors:
+            anchor = evidence_anchor.child
+            for direction in ("previous_chunk_id", "next_chunk_id"):
+                current = anchor
+                for _ in range(self.config.neighbor_window):
+                    chunk_id = getattr(current, direction)
+                    if not chunk_id:
+                        break
+                    neighbor = self.child_by_id.get(chunk_id)
+                    if neighbor is None or not self._structurally_compatible(anchor, neighbor):
+                        break
+                    neighbors.setdefault(neighbor.chunk_id, neighbor)
+                    current = neighbor
+        return sorted(
+            neighbors.values(),
+            key=lambda child: self.child_order.get(child.chunk_id, 10**12),
+        )
+
+    @staticmethod
+    def _page_range(children: list[TechnicalChildChunk]) -> tuple[int, int]:
+        return (
+            min(child.page_start for child in children),
+            max(child.page_end for child in children),
+        )
+
+    def _rendered_tokens(
+        self,
         *,
+        source_number: int,
+        anchor: TechnicalChildChunk,
+        page_start: int,
+        page_end: int,
+        display_text: str,
+    ) -> int:
+        return self.token_counter(
+            render_evidence_block(
+                source_number=source_number,
+                document_title=anchor.document_title,
+                filename=anchor.source_file,
+                chapter=anchor.chapter,
+                section=anchor.section,
+                page_start=page_start,
+                page_end=page_end,
+                display_text=display_text,
+            )
+        )
+
+    def _build_bundle(
+        self,
+        candidate: ParentCandidate,
+        *,
+        source_number: int,
         maximum_tokens: int,
-        use_tail: bool,
-    ) -> tuple[str, int]:
-        """Take the tail of previous context or head of following context."""
+        reserved_anchor_ids: set[str],
+        used_chunk_ids: set[str],
+        seen_documentary_texts: set[str],
+    ) -> EvidenceBundle | None:
+        primary = candidate.anchors[0].child
+        parent, parent_children = self._parent_children(candidate)
+        available_anchors = [
+            anchor
+            for anchor in candidate.anchors
+            if anchor.child.chunk_id not in used_chunk_ids
+        ]
+        if not available_anchors:
+            return None
 
-        if maximum_tokens <= 0:
-            return "", 0
+        parent_ids = {child.chunk_id for child in parent_children}
+        parent_is_available = (
+            parent is not None
+            and parent_children
+            and not any(child.chunk_id in used_chunk_ids for child in parent_children)
+            and all(anchor.child.chunk_id in parent_ids for anchor in available_anchors)
+        )
+        if parent_is_available:
+            normalized_parent = self._normalize_documentary_text(parent.display_text)
+            parent_tokens = self._rendered_tokens(
+                source_number=source_number,
+                anchor=primary,
+                page_start=parent.page_start,
+                page_end=parent.page_end,
+                display_text=parent.display_text,
+            )
+            if normalized_parent not in seen_documentary_texts and parent_tokens <= maximum_tokens:
+                anchor_text = "\n\n".join(
+                    anchor.child.display_text for anchor in available_anchors
+                )
+                documentary_tokens = self.token_counter(parent.display_text)
+                metadata_tokens = self._rendered_tokens(
+                    source_number=source_number,
+                    anchor=primary,
+                    page_start=parent.page_start,
+                    page_end=parent.page_end,
+                    display_text="",
+                )
+                return EvidenceBundle(
+                    source_number=source_number,
+                    document_id=primary.document_id,
+                    document_title=primary.document_title,
+                    filename=primary.source_file,
+                    chapter=primary.chapter,
+                    section=primary.section,
+                    subsection=primary.subsection,
+                    hierarchy_path=primary.hierarchy_path,
+                    page_start=parent.page_start,
+                    page_end=parent.page_end,
+                    parent_id=candidate.parent_id,
+                    anchor_chunk_ids=tuple(
+                        anchor.child.chunk_id for anchor in available_anchors
+                    ),
+                    supporting_chunk_ids=tuple(child.chunk_id for child in parent_children),
+                    display_text=parent.display_text,
+                    token_count=parent_tokens,
+                    documentary_token_count=documentary_tokens,
+                    metadata_token_count=metadata_tokens,
+                    anchor_token_count=self.token_counter(anchor_text),
+                    context_token_count=max(
+                        0,
+                        documentary_tokens - self.token_counter(anchor_text),
+                    ),
+                    best_anchor_score=candidate.best_anchor_score,
+                    context_scope=EvidenceContextScope.FULL_PARENT,
+                    selection_provenance=" | ".join(candidate.selection_provenance),
+                )
 
-        if child.token_count <= maximum_tokens:
-            return child.display_text, child.token_count
+        selected: dict[str, TechnicalChildChunk] = {}
+        selected_anchor_ids: list[str] = []
 
-        ratio = maximum_tokens / child.token_count
-        character_budget = max(1, int(len(child.display_text) * ratio))
-        raw = (
-            child.display_text[-character_budget:]
-            if use_tail
-            else child.display_text[:character_budget]
-        ).strip()
+        def try_add(child: TechnicalChildChunk, *, anchor: bool) -> bool:
+            if child.chunk_id in selected or child.chunk_id in used_chunk_ids:
+                return False
+            normalized = self._normalize_documentary_text(child.display_text)
+            if not normalized or normalized in seen_documentary_texts:
+                return False
+            tentative = [*selected.values(), child]
+            tentative.sort(key=lambda item: self.child_order.get(item.chunk_id, 10**12))
+            page_start, page_end = self._page_range(tentative)
+            display_text = "\n\n".join(item.display_text for item in tentative)
+            if self._rendered_tokens(
+                source_number=source_number,
+                anchor=primary,
+                page_start=page_start,
+                page_end=page_end,
+                display_text=display_text,
+            ) > maximum_tokens:
+                return False
+            selected[child.chunk_id] = child
+            if anchor:
+                selected_anchor_ids.append(child.chunk_id)
+            return True
 
-        if use_tail:
-            boundaries = (". ", "\n")
+        for evidence_anchor in available_anchors:
+            try_add(evidence_anchor.child, anchor=True)
+        if not selected_anchor_ids:
+            return None
 
-            for boundary in boundaries:
-                position = raw.find(boundary)
-
-                if 0 <= position <= len(raw) // 2:
-                    raw = raw[position + len(boundary) :].strip()
-                    break
-        else:
-            boundaries = (". ", "\n")
-
-            for boundary in boundaries:
-                position = raw.rfind(boundary)
-
-                if position >= len(raw) // 2:
-                    raw = raw[: position + 1].strip()
-                    break
-
-        effective_tokens = max(
-            1,
-            min(
-                maximum_tokens,
-                round(child.token_count * len(raw) / max(1, len(child.display_text))),
+        anchor_positions = [self.child_order.get(chunk_id, 10**12) for chunk_id in selected]
+        complementary_parent_children = sorted(
+            (
+                child
+                for child in parent_children
+                if child.chunk_id not in selected
+                and child.chunk_id not in reserved_anchor_ids
+            ),
+            key=lambda child: (
+                min(
+                    abs(self.child_order.get(child.chunk_id, 10**12) - position)
+                    for position in anchor_positions
+                ),
+                self.child_order.get(child.chunk_id, 10**12),
             ),
         )
-        return raw, effective_tokens
+        parent_context_added = False
+        for child in complementary_parent_children:
+            parent_context_added = try_add(child, anchor=False) or parent_context_added
+
+        neighbor_context_added = False
+        for child in self._compatible_neighbors(tuple(available_anchors)):
+            if child.chunk_id in parent_ids or child.chunk_id in reserved_anchor_ids:
+                continue
+            neighbor_context_added = try_add(child, anchor=False) or neighbor_context_added
+
+        ordered = sorted(
+            selected.values(),
+            key=lambda child: self.child_order.get(child.chunk_id, 10**12),
+        )
+        display_text = "\n\n".join(child.display_text for child in ordered)
+        page_start, page_end = self._page_range(ordered)
+        anchor_text = "\n\n".join(
+            self.child_by_id[chunk_id].display_text for chunk_id in selected_anchor_ids
+        )
+        documentary_tokens = self.token_counter(display_text)
+        anchor_tokens = self.token_counter(anchor_text)
+        total_tokens = self._rendered_tokens(
+            source_number=source_number,
+            anchor=primary,
+            page_start=page_start,
+            page_end=page_end,
+            display_text=display_text,
+        )
+        metadata_tokens = self._rendered_tokens(
+            source_number=source_number,
+            anchor=primary,
+            page_start=page_start,
+            page_end=page_end,
+            display_text="",
+        )
+        if parent_context_added:
+            scope = EvidenceContextScope.PARTIAL_PARENT
+        elif neighbor_context_added:
+            scope = EvidenceContextScope.ANCHOR_WITH_NEIGHBORS
+        else:
+            scope = EvidenceContextScope.ANCHOR_ONLY
+        return EvidenceBundle(
+            source_number=source_number,
+            document_id=primary.document_id,
+            document_title=primary.document_title,
+            filename=primary.source_file,
+            chapter=primary.chapter,
+            section=primary.section,
+            subsection=primary.subsection,
+            hierarchy_path=primary.hierarchy_path,
+            page_start=page_start,
+            page_end=page_end,
+            parent_id=candidate.parent_id,
+            anchor_chunk_ids=tuple(selected_anchor_ids),
+            supporting_chunk_ids=tuple(child.chunk_id for child in ordered),
+            display_text=display_text,
+            token_count=total_tokens,
+            documentary_token_count=documentary_tokens,
+            metadata_token_count=metadata_tokens,
+            anchor_token_count=anchor_tokens,
+            context_token_count=max(0, documentary_tokens - anchor_tokens),
+            best_anchor_score=candidate.best_anchor_score,
+            context_scope=scope,
+            selection_provenance=" | ".join(candidate.selection_provenance),
+        )
 
     def expand(
         self,
@@ -204,177 +428,70 @@ class ContextExpander:
         *,
         question_type: str,
     ) -> list[EvidenceBundle]:
-        """Build at most five same-document bundles within 2,600 tokens."""
+        """Pack a dynamic number of deduplicated parent evidence bundles."""
 
+        del question_type
+        candidates = self.group_anchors_by_parent(anchors)
+        reserved_anchor_ids = {
+            anchor.child.chunk_id for candidate in candidates for anchor in candidate.anchors
+        }
         bundles: list[EvidenceBundle] = []
+        used_chunk_ids: set[str] = set()
+        seen_documentary_texts: set[str] = set()
+        used_sections: set[str] = set()
         remaining_total = self.config.max_total_context_tokens
-        used_parents: set[str] = set()
-        retained_anchors = anchors[: self.config.maximum_bundles]
 
-        for anchor_index, anchor in enumerate(retained_anchors):
-            remaining_slots = len(retained_anchors) - anchor_index
-            fair_bundle_budget = max(1, remaining_total // remaining_slots)
-            bundle_budget = min(
-                self.config.max_tokens_per_bundle,
-                fair_bundle_budget,
-            )
-            candidate_ids, parent_available = self._candidate_ids(
-                anchor.child,
-                question_type=question_type,
-                used_parents=used_parents,
-            )
-            source_positions = {
-                chunk_id: position
-                for position, chunk_id in enumerate(candidate_ids)
-            }
-            anchor_position = source_positions.get(anchor.child.chunk_id, 0)
-            candidate_ids.sort(
-                key=lambda chunk_id: (
-                    chunk_id != anchor.child.chunk_id,
-                    abs(source_positions[chunk_id] - anchor_position),
-                )
-            )
-
-            anchor_tokens = min(anchor.child.token_count, bundle_budget)
-            anchor_truncated = anchor.child.token_count > bundle_budget
-            anchor_text = (
-                self._truncate_text(
-                    anchor.child.display_text,
-                    source_tokens=anchor.child.token_count,
-                    maximum_tokens=bundle_budget,
-                )
-                if anchor_truncated
-                else anchor.child.display_text
-            )
-            selected: dict[str, _SelectedPiece] = {
-                anchor.child.chunk_id: _SelectedPiece(
-                    child=anchor.child,
-                    text=anchor_text,
-                    token_count=anchor_tokens,
-                    partial=anchor_truncated,
-                )
-            }
-            used_tokens = anchor_tokens
-
-            expansion_ids = [
-                chunk_id
-                for chunk_id in candidate_ids
-                if chunk_id != anchor.child.chunk_id
-            ][: max(2, self.config.neighbor_window * 2)]
-
-            for candidate_index, chunk_id in enumerate(expansion_ids):
-                remaining = bundle_budget - used_tokens
-                remaining_candidates = len(expansion_ids) - candidate_index
-
-                if remaining < self.config.minimum_context_slice_tokens:
-                    break
-
-                child = self.child_by_id.get(chunk_id)
-
-                if child is None or child.document_id != anchor.child.document_id:
-                    continue
-
-                fair_slice_budget = max(
-                    self.config.minimum_context_slice_tokens,
-                    remaining // max(1, remaining_candidates),
-                )
-                allowed_tokens = min(remaining, fair_slice_budget)
-
-                if child.token_count <= allowed_tokens:
-                    text = child.display_text
-                    token_count = child.token_count
-                    partial = False
-                else:
-                    text, token_count = self._slice_context(
-                        child,
-                        maximum_tokens=allowed_tokens,
-                        use_tail=(
-                            self.child_order[child.chunk_id]
-                            < self.child_order[anchor.child.chunk_id]
-                        ),
-                    )
-                    partial = True
-
-                if not text or token_count <= 0:
-                    continue
-
-                selected[child.chunk_id] = _SelectedPiece(
-                    child=child,
-                    text=text,
-                    token_count=token_count,
-                    partial=partial,
-                )
-                used_tokens += token_count
-
-            ordered = sorted(
-                selected.values(),
-                key=lambda piece: self.child_order[piece.child.chunk_id],
-            )
-            full_text = "\n\n".join(piece.text for piece in ordered)
-            context_tokens = sum(
-                piece.token_count
-                for piece in ordered
-                if piece.child.chunk_id != anchor.child.chunk_id
-            )
-            parent_included = parent_available and len(ordered) > 1
-            context_truncated = any(piece.partial for piece in ordered)
-            bundles.append(
-                EvidenceBundle(
-                    source_number=len(bundles) + 1,
-                    document_id=anchor.child.document_id,
-                    document_title=anchor.child.document_title,
-                    filename=anchor.child.source_file,
-                    chapter=anchor.child.chapter,
-                    section=anchor.child.section,
-                    page_start=min(piece.child.page_start for piece in ordered),
-                    page_end=max(piece.child.page_end for piece in ordered),
-                    anchor_chunk_id=anchor.child.chunk_id,
-                    expanded_chunk_ids=tuple(
-                        piece.child.chunk_id for piece in ordered
-                    ),
-                    display_text=full_text,
-                    token_count=used_tokens,
-                    anchor_token_count=anchor_tokens,
-                    context_token_count=context_tokens,
-                    anchor_score=anchor.score,
-                    selection_provenance=anchor.provenance,
-                    parent_included=parent_included,
-                    context_truncated=context_truncated,
-                )
-            )
-            remaining_total -= used_tokens
-
-            if parent_included:
-                used_parents.add(anchor.child.parent_id)
-
-            if remaining_total <= 0:
+        pending = list(candidates)
+        while pending and remaining_total > 0:
+            if (
+                self.config.maximum_bundles is not None
+                and len(bundles) >= self.config.maximum_bundles
+            ):
                 break
+            pending.sort(
+                key=lambda item: (
+                    -item.best_anchor_score,
+                    self._provenance_priority(item),
+                    (
+                        item.anchors[0].child.section_id in used_sections
+                        if item.anchors[0].child.section_id
+                        else False
+                    ),
+                    item.first_anchor_position,
+                )
+            )
+            packed: EvidenceBundle | None = None
+            packed_candidate: ParentCandidate | None = None
+            bundle_budget = min(self.config.max_tokens_per_bundle, remaining_total)
+            for candidate in pending:
+                packed = self._build_bundle(
+                    candidate,
+                    source_number=len(bundles) + 1,
+                    maximum_tokens=bundle_budget,
+                    reserved_anchor_ids=reserved_anchor_ids,
+                    used_chunk_ids=used_chunk_ids,
+                    seen_documentary_texts=seen_documentary_texts,
+                )
+                if packed is not None:
+                    packed_candidate = candidate
+                    break
+            if packed is None or packed_candidate is None:
+                break
+            bundles.append(packed)
+            pending.remove(packed_candidate)
+            remaining_total -= packed.token_count
+            used_chunk_ids.update(packed.supporting_chunk_ids)
+            seen_documentary_texts.add(
+                self._normalize_documentary_text(packed.display_text)
+            )
+            for chunk_id in packed.supporting_chunk_ids:
+                child = self.child_by_id.get(chunk_id)
+                if child is not None:
+                    seen_documentary_texts.add(
+                        self._normalize_documentary_text(child.display_text)
+                    )
+            section_id = packed_candidate.anchors[0].child.section_id
+            if section_id:
+                used_sections.add(section_id)
 
         return bundles
-
-    @staticmethod
-    def _truncate_text(
-        text: str,
-        *,
-        source_tokens: int,
-        maximum_tokens: int,
-    ) -> str:
-        """Bound a rare oversized anchor without dropping its provenance."""
-
-        if source_tokens <= maximum_tokens:
-            return text
-
-        character_budget = max(
-            1,
-            int(len(text) * maximum_tokens / source_tokens),
-        )
-        truncated = text[:character_budget].rstrip()
-
-        for boundary in (". ", "\n"):
-            position = truncated.rfind(boundary)
-
-            if position >= character_budget // 2:
-                truncated = truncated[: position + 1].rstrip()
-                break
-
-        return truncated + "\n[Context truncated to token budget]"

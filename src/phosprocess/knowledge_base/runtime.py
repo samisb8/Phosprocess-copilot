@@ -9,9 +9,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_KNOWLEDGE_BASE_ROOT = PROJECT_ROOT / "data" / "knowledge_base"
-DEFAULT_CURRENT_INDEX_PATH = (
-    DEFAULT_KNOWLEDGE_BASE_ROOT / "current_index.json"
-)
+DEFAULT_CURRENT_INDEX_PATH = DEFAULT_KNOWLEDGE_BASE_ROOT / "current_index.json"
 
 
 class ActiveKnowledgeBaseError(RuntimeError):
@@ -40,9 +38,7 @@ def _required_non_empty_string(
     value = payload.get(field_name)
 
     if not isinstance(value, str) or not value.strip():
-        raise ActiveKnowledgeBaseError(
-            f"Champ invalide dans current_index.json : {field_name}."
-        )
+        raise ActiveKnowledgeBaseError(f"Champ invalide dans current_index.json : {field_name}.")
 
     return value.strip()
 
@@ -59,9 +55,7 @@ def _resolve_version_directory(
         candidate = project_root / candidate
 
     resolved = candidate.resolve()
-    versions_root = (
-        knowledge_base_root / "indexes" / "versions"
-    ).resolve()
+    versions_root = (knowledge_base_root / "indexes" / "versions").resolve()
 
     if resolved.parent != versions_root:
         raise ActiveKnowledgeBaseError(
@@ -90,8 +84,7 @@ def load_active_knowledge_base(
 
     if not pointer_path.is_file():
         raise ActiveKnowledgeBaseError(
-            "Aucune base documentaire active. Exécutez "
-            "scripts/sync_knowledge_base.py."
+            "Aucune base documentaire active. Exécutez scripts/sync_knowledge_base.py."
         )
 
     try:
@@ -102,9 +95,7 @@ def load_active_knowledge_base(
         ) from error
 
     if not isinstance(payload, dict):
-        raise ActiveKnowledgeBaseError(
-            "current_index.json doit contenir un objet JSON."
-        )
+        raise ActiveKnowledgeBaseError("current_index.json doit contenir un objet JSON.")
 
     version = _required_non_empty_string(payload, "version")
     version_directory = _resolve_version_directory(
@@ -114,9 +105,7 @@ def load_active_knowledge_base(
     )
 
     if version_directory.name != version:
-        raise ActiveKnowledgeBaseError(
-            "La version et le chemin actif ne correspondent pas."
-        )
+        raise ActiveKnowledgeBaseError("La version et le chemin actif ne correspondent pas.")
 
     dense_directory = version_directory / "dense"
     bm25_directory = version_directory / "bm25"
@@ -134,8 +123,7 @@ def load_active_knowledge_base(
     if missing or not corpus_directory.is_dir():
         formatted = ", ".join(str(path) for path in missing)
         raise ActiveKnowledgeBaseError(
-            "La version active est incomplète"
-            + (f" : {formatted}" if formatted else ".")
+            "La version active est incomplète" + (f" : {formatted}" if formatted else ".")
         )
 
     document_count = payload.get("document_count")

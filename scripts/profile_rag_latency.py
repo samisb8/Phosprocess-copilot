@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,9 @@ def _ollama_model_audit() -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Profile one long-lived service and one summary-buffer memory."""
+
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     arguments = build_parser().parse_args(argv)
     logging.basicConfig(
@@ -162,4 +166,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

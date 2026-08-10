@@ -19,6 +19,14 @@ TECHNICAL_EQUIVALENTS: dict[str, tuple[str, ...]] = {
     "enthalpie": ("enthalpy",),
     "débit": ("flow rate",),
     "perte de charge": ("pressure drop",),
+    "diffusion de quantité de mouvement": (
+        "momentum diffusion",
+        "molecular transport of momentum",
+    ),
+    "transport de quantité de mouvement": (
+        "momentum transport",
+        "transport of momentum",
+    ),
     "recirculation": ("recirculation",),
     "pompe de circulation": ("circulation pump",),
     "vapeur de chauffage": ("heating steam",),

@@ -88,9 +88,7 @@ class BM25Config:
         }
 
         if self.method not in allowed_methods:
-            raise ValueError(
-                f"Méthode BM25 non prise en charge : {self.method}"
-            )
+            raise ValueError(f"Méthode BM25 non prise en charge : {self.method}")
 
         if self.k1 < 0:
             raise ValueError("k1 doit être positif ou nul.")
@@ -99,26 +97,17 @@ class BM25Config:
             raise ValueError("b doit être compris entre 0 et 1.")
 
         if self.minimum_score < 0:
-            raise ValueError(
-                "minimum_score doit être positif ou nul."
-            )
+            raise ValueError("minimum_score doit être positif ou nul.")
 
         if self.tokenizer_version != TOKENIZER_VERSION:
-            raise ValueError(
-                "Version de tokenizer inconnue : "
-                f"{self.tokenizer_version}"
-            )
+            raise ValueError(f"Version de tokenizer inconnue : {self.tokenizer_version}")
 
         if self.use_stemming:
-            raise ValueError(
-                "Le stemming n'est pas encore activé dans "
-                "technical_v1."
-            )
+            raise ValueError("Le stemming n'est pas encore activé dans technical_v1.")
 
         if self.remove_stopwords:
             raise ValueError(
-                "La suppression des stopwords n'est pas encore "
-                "activée dans technical_v1."
+                "La suppression des stopwords n'est pas encore activée dans technical_v1."
             )
 
 
@@ -147,13 +136,9 @@ def load_bm25_config(config_path: Path) -> BM25Config:
     """Lire la configuration BM25 depuis retrieval.yaml."""
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Configuration introuvable : {config_path}"
-        )
+        raise FileNotFoundError(f"Configuration introuvable : {config_path}")
 
-    raw_config = yaml.safe_load(
-        config_path.read_text(encoding="utf-8")
-    )
+    raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(raw_config, dict):
         raise ValueError("Configuration retrieval.yaml invalide.")
@@ -161,18 +146,14 @@ def load_bm25_config(config_path: Path) -> BM25Config:
     bm25_config = raw_config.get("bm25")
 
     if not isinstance(bm25_config, dict):
-        raise ValueError(
-            "La section 'bm25' est absente ou invalide."
-        )
+        raise ValueError("La section 'bm25' est absente ou invalide.")
 
     tokenizer_config = bm25_config.get("tokenizer")
     data_config = bm25_config.get("data")
     index_config = bm25_config.get("index")
 
     if not isinstance(tokenizer_config, dict):
-        raise ValueError(
-            "La section bm25.tokenizer est invalide."
-        )
+        raise ValueError("La section bm25.tokenizer est invalide.")
 
     if not isinstance(data_config, dict):
         raise ValueError("La section bm25.data est invalide.")
@@ -185,34 +166,16 @@ def load_bm25_config(config_path: Path) -> BM25Config:
         k1=float(bm25_config["k1"]),
         b=float(bm25_config["b"]),
         backend=str(bm25_config.get("backend", "numpy")),
-        csc_backend=str(
-            bm25_config.get("csc_backend", "numpy")
-        ),
-        minimum_score=float(
-            bm25_config.get("minimum_score", 0.0)
-        ),
+        csc_backend=str(bm25_config.get("csc_backend", "numpy")),
+        minimum_score=float(bm25_config.get("minimum_score", 0.0)),
         tokenizer_version=str(tokenizer_config["version"]),
-        use_stemming=bool(
-            tokenizer_config.get("use_stemming", False)
-        ),
-        remove_stopwords=bool(
-            tokenizer_config.get("remove_stopwords", False)
-        ),
-        chunks_directory=str(
-            data_config["chunks_directory"]
-        ),
-        output_directory=str(
-            index_config["output_directory"]
-        ),
-        metadata_filename=str(
-            index_config["metadata_filename"]
-        ),
-        manifest_filename=str(
-            index_config["manifest_filename"]
-        ),
-        pipeline_version=str(
-            bm25_config.get("pipeline_version", "unknown")
-        ),
+        use_stemming=bool(tokenizer_config.get("use_stemming", False)),
+        remove_stopwords=bool(tokenizer_config.get("remove_stopwords", False)),
+        chunks_directory=str(data_config["chunks_directory"]),
+        output_directory=str(index_config["output_directory"]),
+        metadata_filename=str(index_config["metadata_filename"]),
+        manifest_filename=str(index_config["manifest_filename"]),
+        pipeline_version=str(bm25_config.get("pipeline_version", "unknown")),
     )
 
 
@@ -233,9 +196,7 @@ def normalize_lexical_text(text: str) -> str:
         normalized,
     )
 
-    normalized = normalized.translate(
-        _TRANSLATION_TABLE
-    )
+    normalized = normalized.translate(_TRANSLATION_TABLE)
 
     normalized = normalized.casefold()
 
@@ -269,19 +230,11 @@ def technical_tokenize(text: str) -> list[str]:
 def build_lexical_text(chunk: DocumentChunk) -> str:
     """Construire le champ textuel réellement indexé par BM25."""
 
-    source_name = (
-        Path(chunk.source_file)
-        .stem
-        .replace("_", " ")
-    )
+    source_name = Path(chunk.source_file).stem.replace("_", " ")
 
     parts = [source_name]
 
-    parts.extend(
-        heading
-        for heading in chunk.heading_path
-        if heading.strip()
-    )
+    parts.extend(heading for heading in chunk.heading_path if heading.strip())
 
     parts.append(chunk.text)
 
@@ -300,19 +253,11 @@ class BM25Retriever:
         self.index_directory = index_directory.resolve()
         self.config_path = config_path.resolve()
 
-        self.config = load_bm25_config(
-            self.config_path
-        )
+        self.config = load_bm25_config(self.config_path)
 
-        self.metadata_path = (
-            self.index_directory
-            / self.config.metadata_filename
-        )
+        self.metadata_path = self.index_directory / self.config.metadata_filename
 
-        self.manifest_path = (
-            self.index_directory
-            / self.config.manifest_filename
-        )
+        self.manifest_path = self.index_directory / self.config.manifest_filename
 
         self._check_required_files()
 
@@ -323,13 +268,9 @@ class BM25Retriever:
             show_progress=False,
         )
 
-        self.metadata = self._load_metadata(
-            self.metadata_path
-        )
+        self.metadata = self._load_metadata(self.metadata_path)
 
-        self.manifest = self._load_manifest(
-            self.manifest_path
-        )
+        self.manifest = self._load_manifest(self.manifest_path)
 
         self._validate_loaded_index()
 
@@ -353,49 +294,29 @@ class BM25Retriever:
         cleaned_query = query.strip()
 
         if not cleaned_query:
-            raise ValueError(
-                "La requête BM25 ne peut pas être vide."
-            )
+            raise ValueError("La requête BM25 ne peut pas être vide.")
 
         if top_k <= 0:
-            raise ValueError(
-                "top_k doit être strictement positif."
-            )
+            raise ValueError("top_k doit être strictement positif.")
 
-        threshold = (
-            self.config.minimum_score
-            if minimum_score is None
-            else minimum_score
-        )
+        threshold = self.config.minimum_score if minimum_score is None else minimum_score
 
         if threshold < 0:
-            raise ValueError(
-                "minimum_score doit être positif ou nul."
-            )
+            raise ValueError("minimum_score doit être positif ou nul.")
 
         normalized_chunk_ids = (
-            {chunk_id.strip() for chunk_id in chunk_ids if chunk_id.strip()}
-            if chunk_ids
-            else None
+            {chunk_id.strip() for chunk_id in chunk_ids if chunk_id.strip()} if chunk_ids else None
         )
         normalized_document_ids = (
-            {
-                document_id.strip()
-                for document_id in document_ids
-                if document_id.strip()
-            }
+            {document_id.strip() for document_id in document_ids if document_id.strip()}
             if document_ids
             else None
         )
 
-        query_tokens = technical_tokenize(
-            cleaned_query
-        )
+        query_tokens = technical_tokenize(cleaned_query)
 
         if not query_tokens:
-            raise ValueError(
-                "Aucun token exploitable dans la requête."
-            )
+            raise ValueError("Aucun token exploitable dans la requête.")
 
         retrieval_k = (
             self.total_documents
@@ -413,9 +334,7 @@ class BM25Retriever:
             show_progress=False,
         )
 
-        duration_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
+        duration_ms = (time.perf_counter() - start_time) * 1000
 
         lexical_ids = raw_results.documents[0]
         scores = raw_results.scores[0]
@@ -440,10 +359,7 @@ class BM25Retriever:
 
             chunk = self.metadata[lexical_id]
 
-            if (
-                normalized_document_ids
-                and chunk.document_id not in normalized_document_ids
-            ):
+            if normalized_document_ids and chunk.document_id not in normalized_document_ids:
                 continue
 
             if normalized_chunk_ids and chunk.chunk_id not in normalized_chunk_ids:
@@ -486,22 +402,12 @@ class BM25Retriever:
             self.index_directory / "indptr.csc.index.npy",
         ]
 
-        missing_files = [
-            path
-            for path in required_files
-            if not path.exists()
-        ]
+        missing_files = [path for path in required_files if not path.exists()]
 
         if missing_files:
-            formatted = "\n".join(
-                f"- {path}"
-                for path in missing_files
-            )
+            formatted = "\n".join(f"- {path}" for path in missing_files)
 
-            raise FileNotFoundError(
-                "Artefacts BM25 manquants :\n"
-                f"{formatted}"
-            )
+            raise FileNotFoundError(f"Artefacts BM25 manquants :\n{formatted}")
 
     @staticmethod
     def _load_metadata(
@@ -521,47 +427,31 @@ class BM25Retriever:
                 start=1,
             ):
                 if not line.strip():
-                    raise ValueError(
-                        f"{path.name}, ligne "
-                        f"{line_number} vide."
-                    )
+                    raise ValueError(f"{path.name}, ligne {line_number} vide.")
 
                 try:
                     record = json.loads(line)
                 except json.JSONDecodeError as error:
                     raise ValueError(
-                        f"{path.name}, ligne "
-                        f"{line_number} : JSON invalide."
+                        f"{path.name}, ligne {line_number} : JSON invalide."
                     ) from error
 
                 if not isinstance(record, dict):
-                    raise ValueError(
-                        f"{path.name}, ligne "
-                        f"{line_number} : objet attendu."
-                    )
+                    raise ValueError(f"{path.name}, ligne {line_number} : objet attendu.")
 
                 lexical_id = record.pop(
                     "lexical_id",
                     None,
                 )
 
-                if (
-                    not isinstance(lexical_id, int)
-                    or isinstance(lexical_id, bool)
-                ):
-                    raise ValueError(
-                        f"{path.name}, ligne "
-                        f"{line_number} : lexical_id invalide."
-                    )
+                if not isinstance(lexical_id, int) or isinstance(lexical_id, bool):
+                    raise ValueError(f"{path.name}, ligne {line_number} : lexical_id invalide.")
 
                 try:
-                    chunk = DocumentChunk.model_validate(
-                        record
-                    )
+                    chunk = DocumentChunk.model_validate(record)
                 except ValidationError as error:
                     raise ValueError(
-                        f"{path.name}, ligne "
-                        f"{line_number} : chunk invalide."
+                        f"{path.name}, ligne {line_number} : chunk invalide."
                     ) from error
 
                 lexical_ids.append(lexical_id)
@@ -570,10 +460,7 @@ class BM25Retriever:
         expected_ids = list(range(len(chunks)))
 
         if lexical_ids != expected_ids:
-            raise ValueError(
-                "Les lexical_id ne sont pas continus "
-                "et correctement ordonnés."
-            )
+            raise ValueError("Les lexical_id ne sont pas continus et correctement ordonnés.")
 
         return chunks
 
@@ -582,27 +469,19 @@ class BM25Retriever:
         """Charger le manifest de construction."""
 
         try:
-            manifest = json.loads(
-                path.read_text(encoding="utf-8")
-            )
+            manifest = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
-            raise ValueError(
-                f"Manifest BM25 invalide : {path}"
-            ) from error
+            raise ValueError(f"Manifest BM25 invalide : {path}") from error
 
         if not isinstance(manifest, dict):
-            raise ValueError(
-                "Le manifest BM25 doit être un objet JSON."
-            )
+            raise ValueError("Le manifest BM25 doit être un objet JSON.")
 
         return manifest
 
     def _validate_loaded_index(self) -> None:
         """Comparer index, configuration et métadonnées."""
 
-        indexed_documents = int(
-            self.model.scores["num_docs"]
-        )
+        indexed_documents = int(self.model.scores["num_docs"])
 
         if indexed_documents != self.total_documents:
             raise ValueError(
@@ -612,46 +491,23 @@ class BM25Retriever:
             )
 
         if self.model.method != self.config.method:
-            raise ValueError(
-                "La méthode BM25 de l'index ne correspond "
-                "pas à retrieval.yaml."
-            )
+            raise ValueError("La méthode BM25 de l'index ne correspond pas à retrieval.yaml.")
 
-        if not abs(
-            float(self.model.k1) - self.config.k1
-        ) < 1e-12:
-            raise ValueError(
-                "Le paramètre k1 de l'index a changé."
-            )
+        if not abs(float(self.model.k1) - self.config.k1) < 1e-12:
+            raise ValueError("Le paramètre k1 de l'index a changé.")
 
-        if not abs(
-            float(self.model.b) - self.config.b
-        ) < 1e-12:
-            raise ValueError(
-                "Le paramètre b de l'index a changé."
-            )
+        if not abs(float(self.model.b) - self.config.b) < 1e-12:
+            raise ValueError("Le paramètre b de l'index a changé.")
 
         tokenizer = self.manifest.get("tokenizer")
 
         if not isinstance(tokenizer, dict):
-            raise ValueError(
-                "Informations tokenizer absentes du manifest."
-            )
+            raise ValueError("Informations tokenizer absentes du manifest.")
 
-        if (
-            tokenizer.get("version")
-            != TOKENIZER_VERSION
-        ):
-            raise ValueError(
-                "Le tokenizer du manifest est incompatible."
-            )
+        if tokenizer.get("version") != TOKENIZER_VERSION:
+            raise ValueError("Le tokenizer du manifest est incompatible.")
 
-        chunk_ids = [
-            chunk.chunk_id
-            for chunk in self.metadata
-        ]
+        chunk_ids = [chunk.chunk_id for chunk in self.metadata]
 
         if len(chunk_ids) != len(set(chunk_ids)):
-            raise ValueError(
-                "Des chunk_id sont dupliqués dans BM25."
-            )
+            raise ValueError("Des chunk_id sont dupliqués dans BM25.")

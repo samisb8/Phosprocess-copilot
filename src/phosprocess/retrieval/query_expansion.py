@@ -11,75 +11,60 @@ from phosprocess.retrieval.technical_lexicon import TECHNICAL_EQUIVALENTS
 # Intent terms are deliberately short and generic. They are not facts and are
 # used only to improve retrieval recall for query types whose wording is often
 # underspecified (for example: "décris le trajet dans cet équipement").
+
 _INTENT_EQUIVALENTS: dict[str, tuple[str, ...]] = {
     "process_flow": (
+        "process sequence",
         "flow path",
-        "circulation loop",
-        "feed inlet",
-        "weak acid feed",
-        "dilute phosphoric acid feed",
-        "feed line",
-        "acid is introduced",
-        "concentrated acid withdrawal",
-        "product acid withdrawal",
-        "product draw-off",
-        "acid sent to storage",
-        "circulation pump",
-        "heat exchanger",
-        "flash chamber",
-        "recirculation line",
-        "product outlet",
+        "entry",
+        "transition",
+        "exit",
     ),
     "procedure": (
-        "process sequence",
-        "operating steps",
-        "inlet",
-        "outlet",
+        "ordered steps",
+        "prerequisites",
+        "actions",
+        "outcome",
     ),
     "balance": (
-        "mass balance",
-        "material balance",
-        "component balance",
-        "P2O5 balance",
-        "heat balance",
-        "energy balance",
-        "enthalpy balance",
-        "steady state",
+        "conservation relation",
+        "inputs",
+        "outputs",
+        "variables",
+        "units",
+    ),
+    "comparison": (
+        "similarities",
+        "differences",
+        "comparison criteria",
     ),
     "troubleshooting": (
-        "operating problems",
-        "cause effect",
-        "fouling scaling",
-        "performance loss",
+        "symptom",
+        "causes",
+        "effects",
+        "corrective actions",
     ),
     "momentum_diffusion": (
-        "molecular transport of momentum",
-        "momentum flux",
-        "velocity gradient",
-        "shear stress",
-        "Newton law of viscosity",
-        "dynamic viscosity",
+        "definition",
+        "governing relation",
+        "variables",
     ),
 }
 
 # Dense retrieval benefits from a concise and balanced semantic hint. BM25 still
-# receives every lexical variant. Process-flow hints deliberately cover the inlet,
-# circulation/heating, vapor separation/return and product withdrawal so one stage
-# cannot displace the others merely because it has more synonyms.
+# receives every lexical variant. Dense hints describe only information structure.
 _DENSE_INTENT_LIMIT = 5
+
 _DENSE_INTENT_HINTS: dict[str, tuple[str, ...]] = {
     "process_flow": (
+        "process sequence",
         "flow path",
-        "weak acid feed",
-        "circulation pump heat exchanger",
-        "flash chamber recirculation",
-        "concentrated acid withdrawal",
+        "entry transitions exit",
     ),
-    "momentum_diffusion": (
-        "molecular transport of momentum",
-        "momentum flux velocity gradient",
-        "Newton law of viscosity",
-    ),
+    "procedure": ("ordered procedure",),
+    "balance": ("conservation inputs outputs",),
+    "comparison": ("similarities differences",),
+    "troubleshooting": ("symptom causes corrective actions",),
 }
 
 
@@ -120,9 +105,8 @@ def expand_technical_query(
     """Add lexical equivalents plus a small intent-specific retrieval hint.
 
     The original and standalone questions remain unchanged. Intent expansion is
-    deterministic and does not inject domain facts; it only names common parts
-    of the requested information structure, such as inlet, pump, exchanger,
-    flash chamber and outlet for a process-flow question.
+    deterministic and does not inject domain facts; it only names generic
+    information-structure hints such as sequence, entry, transition and exit.
     """
 
     original = original_query.strip()
@@ -156,9 +140,7 @@ def expand_technical_query(
         tuple(intent_additions),
     )
     dense_hints = [
-        hint
-        for hint in configured_dense_hints
-        if normalize_query(hint) not in normalized
+        hint for hint in configured_dense_hints if normalize_query(hint) not in normalized
     ][:_DENSE_INTENT_LIMIT]
     dense = " ".join([standalone, *dense_hints]).strip()
     bm25 = " ".join([standalone, *all_additions]).strip()

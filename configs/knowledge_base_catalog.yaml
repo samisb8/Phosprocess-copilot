@@ -4,6 +4,10 @@ documents:
   - document_id: becker_phosphates_and_phosphoric_acid
     canonical_filename: 01_becker_phosphates_and_phosphoric_acid.pdf
     source_filename: 01_becker_phosphates_and_phosphoric_acid.pdf
+    aliases:
+      - becker
+      - pierre becker
+      - phosphates and phosphoric acid
     display_title: Phosphates and Phosphoric Acid
     authors:
       - Pierre Becker
@@ -32,6 +36,11 @@ documents:
   - document_id: smith_van_ness_chemical_engineering_thermodynamics
     canonical_filename: 02_chemical_engineering_thermodynamics_9e.pdf
     source_filename: 02_chemical_engineering_thermodynamics_9e.pdf
+    aliases:
+      - thermodynamics
+      - smith
+      - smith van ness
+      - introduction to chemical engineering thermodynamics
     display_title: Introduction to Chemical Engineering Thermodynamics
     authors:
       - J. M. Smith
@@ -54,15 +63,19 @@ documents:
       - vapor-liquid equilibrium
     priority: 95
     plant_specific: false
-    sha256: 793a9afe6ca63ff5092acd144c907ea6dea5833235ca4b9c2ef2c5fb391eb5fa
-    page_count: 37
+    sha256: 635a47380915e7c5b7a0bc79e90b10b1bbc104236eb7022f429e217e2a9b834f
+    page_count: 781
     ingestion_version: quality-v1
     active: true
-    extraction_status: incomplete_source
+    extraction_status: native_text
 
   - document_id: incropera_fundamentals_heat_mass_transfer
     canonical_filename: 03_fundamentals_heat_mass_transfer.pdf
     source_filename: 03_fundamentals_heat_mass_transfer.pdf
+    aliases:
+      - heat_transfer
+      - incropera
+      - fundamentals of heat and mass transfer
     display_title: Fundamentals of Heat and Mass Transfer
     authors:
       - Frank P. Incropera
@@ -95,6 +108,16 @@ documents:
   - document_id: ocp_phosphoric_acid_workshop_report
     canonical_filename: 04_rapport_atelier_acide_phosphorique.pdf
     source_filename: 04_rapport_atelier_acide_phosphorique.pdf
+    aliases:
+      - report
+      - rapport
+      - rapport ocp
+      - rapport atelier
+      - rapport d'atelier
+      - atelier ocp
+      - rapport de l'atelier d'acide phosphorique
+      - jfc4 report
+      - ocp jfc4
     display_title: Rapport de l’atelier d’acide phosphorique
     authors:
       - Auteur institutionnel non identifié
@@ -139,6 +162,10 @@ documents:
   - document_id: perrys_chemical_engineers_handbook
     canonical_filename: 05_perrys_chemical_engineers_handbook_9e.pdf
     source_filename: 05_perrys_chemical_engineers_handbook_9e.pdf
+    aliases:
+      - perry
+      - perrys chemical engineers handbook
+      - chemical engineers handbook
     display_title: Perry’s Chemical Engineers’ Handbook
     authors:
       - Don W. Green
@@ -163,8 +190,8 @@ documents:
       - process safety
     priority: 85
     plant_specific: false
-    sha256: 96b89f697cb4b72f812b68ea612da8b708e34d957ce1f9e41c38c528804ce9f3
-    page_count: 6815
+    sha256: 56109c58a23cb9361ecee2f47d0bc1395bbd3d43cb05f1cc0f8e262922097118
+    page_count: 2273
     ingestion_version: quality-v1
     active: true
     extraction_status: native_text
@@ -172,6 +199,10 @@ documents:
   - document_id: mullin_crystallization
     canonical_filename: 06_mullin_crystallization_4e.pdf
     source_filename: 06_mullin_crystallization_4e.pdf
+    aliases:
+      - crystallization
+      - mullin
+      - mullin crystallization
     display_title: Crystallization
     authors:
       - J. W. Mullin
@@ -199,6 +230,10 @@ documents:
   - document_id: seborg_process_dynamics_control
     canonical_filename: 07_process_dynamics_control_seborg_4e.pdf
     source_filename: 07_process_dynamics_control_seborg_4e.pdf
+    aliases:
+      - control
+      - seborg
+      - process dynamics and control
     display_title: Process Dynamics and Control
     authors:
       - Dale E. Seborg
@@ -231,6 +266,10 @@ documents:
   - document_id: bird_transport_phenomena
     canonical_filename: 08_transport_phenomena_bird_2e.pdf
     source_filename: 08_transport_phenomena_bird_2e.pdf
+    aliases:
+      - transport
+      - bird
+      - transport phenomena
     display_title: Transport Phenomena
     authors:
       - R. Byron Bird

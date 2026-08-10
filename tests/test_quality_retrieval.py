@@ -152,7 +152,7 @@ class _Reranker:
         )
 
 
-def test_quality_retrieval_returns_five_bounded_bundles(
+def test_quality_retrieval_returns_dynamic_bounded_bundles(
     tmp_path: Path,
 ) -> None:
     technical: list[TechnicalChildChunk] = []
@@ -235,11 +235,12 @@ def test_quality_retrieval_returns_five_bounded_bundles(
     )
 
     assert len(result.hybrid.results) == 20
-    assert len(result.selected) == 5
-    assert len(result.bundles) == 5
-    assert len(
-        {bundle.anchor_chunk_id for bundle in result.bundles}
-    ) == 5
+    assert result.selected
+    assert result.bundles
+    assert len({bundle.parent_id for bundle in result.bundles}) == len(result.bundles)
+    assert {item.chunk_id for item in result.selected} == {
+        chunk_id for bundle in result.bundles for chunk_id in bundle.anchor_chunk_ids
+    }
     assert sum(bundle.token_count for bundle in result.bundles) <= 2600
 
 
@@ -250,6 +251,12 @@ def test_quality_inference_has_no_gold_or_reference_answer_input() -> None:
     assert "gold" not in source
     assert "reference_answer" not in source
     assert "query_id" not in signature.parameters
+
+
+def test_quality_source_routing_uses_original_user_wording() -> None:
+    source = inspect.getsource(QualityRetrievalEngine.retrieve)
+    routing_call = source.split("routing = route_query(", maxsplit=1)[1]
+    assert routing_call.lstrip().startswith("original_question,")
 
 
 class _CoverageAwareRecorder:
@@ -285,7 +292,7 @@ class _CoverageAwareRecorder:
         )
 
 
-def test_process_flow_recovers_product_outlet_outside_primary_pool(
+def test_process_flow_does_not_recover_a_python_expected_stage(
     tmp_path: Path,
 ) -> None:
     document_id = "becker_phosphates_and_phosphoric_acid"
@@ -397,64 +404,18 @@ def test_process_flow_recovers_product_outlet_outside_primary_pool(
         question_type="process_flow",
     )
 
-    assert result.coverage.complete
-    assert "flow_21" in {item.chunk_id for item in result.selected}
-    assert any(
-        "coverage_recovery" in candidate.matched_retrievers
+    assert "flow_21" not in {item.chunk_id for item in result.selected}
+    assert all(
+        "coverage_recovery" not in candidate.matched_retrievers
         for candidate in result.hybrid.results
     )
 
 
-def test_process_scope_removes_refrigeration_passage() -> None:
-    from phosprocess.retrieval.retrieval_planner import build_retrieval_plan
-
-    process = _chunk("process", "book").model_copy(
-        update={
-            "section": "EVAPORATOR TYPES AND APPLICATIONS",
-            "text": (
-                "A forced-circulation evaporator pump returns circulating "
-                "liquor to the flash chamber."
-            ),
-        }
+def test_retrieval_has_no_question_specific_wrong_domain_filter() -> None:
+    assert not hasattr(
+        QualityRetrievalEngine,
+        "_filter_process_scope_incompatibilities",
     )
-    refrigeration = _chunk("refrigeration", "book").model_copy(
-        update={
-            "section": "MECHANICAL REFRIGERATION (VAPOR COMPRESSION SYSTEMS)",
-            "text": (
-                "Liquid refrigerant enters the air cooler and the refrigerant "
-                "returns to the compressor crankcase."
-            ),
-        }
-    )
-    response = RerankingResponse(
-        query="circulation pump",
-        model_name="model",
-        device="cpu",
-        candidates_received=2,
-        top_k_requested=2,
-        reranking_duration_ms=1.0,
-        results=[
-            _result(1, 0.9, refrigeration),
-            _result(2, 0.8, process),
-        ],
-    )
-    question = "Quel est le rôle de la pompe de circulation ?"
-    plan = build_retrieval_plan(
-        question,
-        standalone_query=(
-            "Quel est le rôle de la pompe de circulation dans un évaporateur "
-            "à circulation forcée d'acide phosphorique ?"
-        ),
-        question_type="explanation",
-    )
-
-    filtered = QualityRetrievalEngine._filter_process_scope_incompatibilities(
-        response,
-        plan=plan,
-    )
-
-    assert [item.chunk.chunk_id for item in filtered.results] == ["process"]
-    assert filtered.results[0].rank == 1
 
 
 def test_report_section_affinity_breaks_close_reranker_tie() -> None:

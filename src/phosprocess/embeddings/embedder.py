@@ -25,15 +25,8 @@ def resolve_cached_model_source(
     if direct_path.is_dir():
         return str(direct_path.resolve())
 
-    cache_root = (
-        Path(cache_dir)
-        if cache_dir is not None
-        else Path(HF_HUB_CACHE)
-    )
-    model_cache = (
-        cache_root
-        / f"models--{model_name.replace('/', '--')}"
-    )
+    cache_root = Path(cache_dir) if cache_dir is not None else Path(HF_HUB_CACHE)
+    model_cache = cache_root / f"models--{model_name.replace('/', '--')}"
     main_reference = model_cache / "refs" / "main"
 
     if main_reference.is_file():
@@ -46,11 +39,7 @@ def resolve_cached_model_source(
     snapshots = model_cache / "snapshots"
 
     if snapshots.is_dir():
-        available = sorted(
-            path
-            for path in snapshots.iterdir()
-            if path.is_dir()
-        )
+        available = sorted(path for path in snapshots.iterdir() if path.is_dir())
 
         if len(available) == 1:
             return str(available[0].resolve())
@@ -85,86 +74,54 @@ class EmbeddingConfig:
             raise ValueError("model_name ne peut pas être vide.")
 
         if self.embedding_dimension <= 0:
-            raise ValueError(
-                "embedding_dimension doit être strictement positif."
-            )
+            raise ValueError("embedding_dimension doit être strictement positif.")
 
         if self.batch_size <= 0:
-            raise ValueError(
-                "batch_size doit être strictement positif."
-            )
+            raise ValueError("batch_size doit être strictement positif.")
 
         if self.passage_max_length <= 0:
-            raise ValueError(
-                "passage_max_length doit être strictement positif."
-            )
+            raise ValueError("passage_max_length doit être strictement positif.")
 
         if self.query_max_length <= 0:
-            raise ValueError(
-                "query_max_length doit être strictement positif."
-            )
+            raise ValueError("query_max_length doit être strictement positif.")
 
 
 def load_embedding_config(config_path: Path) -> EmbeddingConfig:
     """Lire la configuration YAML des embeddings."""
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Configuration introuvable : {config_path}"
-        )
+        raise FileNotFoundError(f"Configuration introuvable : {config_path}")
 
-    raw_config = yaml.safe_load(
-        config_path.read_text(encoding="utf-8")
-    )
+    raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(raw_config, dict):
-        raise ValueError(
-            f"Configuration YAML invalide : {config_path}"
-        )
+        raise ValueError(f"Configuration YAML invalide : {config_path}")
 
     model_config = raw_config.get("model")
     inference_config = raw_config.get("inference")
 
     if not isinstance(model_config, dict):
-        raise ValueError(
-            "La section 'model' est absente ou invalide."
-        )
+        raise ValueError("La section 'model' est absente ou invalide.")
 
     if not isinstance(inference_config, dict):
-        raise ValueError(
-            "La section 'inference' est absente ou invalide."
-        )
+        raise ValueError("La section 'inference' est absente ou invalide.")
 
     cache_dir_value = model_config.get("cache_dir")
 
-    cache_dir = (
-        str(cache_dir_value)
-        if cache_dir_value is not None
-        else None
-    )
+    cache_dir = str(cache_dir_value) if cache_dir_value is not None else None
 
     return EmbeddingConfig(
         model_name=str(model_config["name"]),
         embedding_dimension=int(model_config["dimension"]),
         device=str(model_config.get("device", "auto")),
         use_fp16=bool(model_config.get("use_fp16", True)),
-        normalize_embeddings=bool(
-            model_config.get("normalize_embeddings", True)
-        ),
-        trust_remote_code=bool(
-            model_config.get("trust_remote_code", False)
-        ),
+        normalize_embeddings=bool(model_config.get("normalize_embeddings", True)),
+        trust_remote_code=bool(model_config.get("trust_remote_code", False)),
         cache_dir=cache_dir,
         batch_size=int(inference_config["batch_size"]),
-        passage_max_length=int(
-            inference_config["passage_max_length"]
-        ),
-        query_max_length=int(
-            inference_config["query_max_length"]
-        ),
-        pipeline_version=str(
-            raw_config.get("pipeline_version", "0.1.0")
-        ),
+        passage_max_length=int(inference_config["passage_max_length"]),
+        query_max_length=int(inference_config["query_max_length"]),
+        pipeline_version=str(raw_config.get("pipeline_version", "0.1.0")),
     )
 
 
@@ -175,15 +132,9 @@ class BGEEmbedder:
         self.config = config
         self._device = self._resolve_device(config.device)
 
-        effective_fp16 = (
-            config.use_fp16
-            and self._device.startswith("cuda")
-        )
+        effective_fp16 = config.use_fp16 and self._device.startswith("cuda")
 
-        print(
-            f"Chargement de {config.model_name} "
-            f"sur {self._device}..."
-        )
+        print(f"Chargement de {config.model_name} sur {self._device}...")
 
         model_source = resolve_cached_model_source(
             config.model_name,
@@ -191,9 +142,7 @@ class BGEEmbedder:
         )
         self._model: Any = BGEM3FlagModel(
             model_source,
-            normalize_embeddings=(
-                config.normalize_embeddings
-            ),
+            normalize_embeddings=(config.normalize_embeddings),
             use_fp16=effective_fp16,
             devices=self._device,
             trust_remote_code=config.trust_remote_code,
@@ -217,6 +166,14 @@ class BGEEmbedder:
         """Dimension attendue d'un embedding."""
 
         return self.config.embedding_dimension
+
+    def count_tokens(self, text: str) -> int:
+        """Count text with the tokenizer already loaded by BGE-M3."""
+
+        tokenizer = getattr(self._model, "tokenizer", None)
+        if tokenizer is None or not callable(getattr(tokenizer, "encode", None)):
+            raise RuntimeError("Le tokenizer BGE-M3 n'est pas disponible.")
+        return len(tokenizer.encode(text, add_special_tokens=False))
 
     def embed_query(self, query: str) -> np.ndarray:
         """Encoder une requête et retourner un vecteur 1D."""
@@ -399,17 +356,10 @@ class BGEEmbedder:
 
         cleaned_texts = [text.strip() for text in texts]
 
-        empty_positions = [
-            index
-            for index, text in enumerate(cleaned_texts)
-            if not text
-        ]
+        empty_positions = [index for index, text in enumerate(cleaned_texts) if not text]
 
         if empty_positions:
-            raise ValueError(
-                "Textes vides détectés aux positions : "
-                f"{empty_positions}"
-            )
+            raise ValueError(f"Textes vides détectés aux positions : {empty_positions}")
 
         batch_size = min(
             self.config.batch_size,
@@ -435,8 +385,7 @@ class BGEEmbedder:
 
                 if batch_size <= 1:
                     raise RuntimeError(
-                        "Mémoire GPU insuffisante même avec "
-                        "batch_size=1."
+                        "Mémoire GPU insuffisante même avec batch_size=1."
                     ) from error
 
                 previous_batch_size = batch_size
@@ -444,11 +393,7 @@ class BGEEmbedder:
 
                 torch.cuda.empty_cache()
 
-                print(
-                    "Mémoire GPU insuffisante : "
-                    f"batch_size {previous_batch_size} "
-                    f"→ {batch_size}"
-                )
+                print(f"Mémoire GPU insuffisante : batch_size {previous_batch_size} → {batch_size}")
 
     def _run_encoding(
         self,
@@ -469,14 +414,10 @@ class BGEEmbedder:
         )
 
         if not isinstance(output, dict):
-            raise TypeError(
-                "La sortie de BGE-M3 doit être un dictionnaire."
-            )
+            raise TypeError("La sortie de BGE-M3 doit être un dictionnaire.")
 
         if "dense_vecs" not in output:
-            raise KeyError(
-                "La sortie BGE-M3 ne contient pas 'dense_vecs'."
-            )
+            raise KeyError("La sortie BGE-M3 ne contient pas 'dense_vecs'.")
 
         return np.asarray(
             output["dense_vecs"],
@@ -493,8 +434,7 @@ class BGEEmbedder:
 
         if vectors.ndim != 2:
             raise ValueError(
-                "Les embeddings doivent former une matrice 2D, "
-                f"forme reçue : {vectors.shape}."
+                f"Les embeddings doivent former une matrice 2D, forme reçue : {vectors.shape}."
             )
 
         expected_shape = (
@@ -503,15 +443,10 @@ class BGEEmbedder:
         )
 
         if vectors.shape != expected_shape:
-            raise ValueError(
-                "Dimension inattendue : "
-                f"{vectors.shape}, attendu {expected_shape}."
-            )
+            raise ValueError(f"Dimension inattendue : {vectors.shape}, attendu {expected_shape}.")
 
         if not np.isfinite(vectors).all():
-            raise ValueError(
-                "Les embeddings contiennent NaN ou une valeur infinie."
-            )
+            raise ValueError("Les embeddings contiennent NaN ou une valeur infinie.")
 
         if self.config.normalize_embeddings:
             vectors = self._normalize_l2(vectors)
@@ -526,10 +461,7 @@ class BGEEmbedder:
                 1.0,
                 atol=1e-4,
             ):
-                raise ValueError(
-                    "Les embeddings ne sont pas correctement "
-                    "normalisés."
-                )
+                raise ValueError("Les embeddings ne sont pas correctement normalisés.")
 
         return np.ascontiguousarray(
             vectors,
@@ -549,9 +481,7 @@ class BGEEmbedder:
         )
 
         if np.any(norms <= 0):
-            raise ValueError(
-                "Un embedding possède une norme nulle."
-            )
+            raise ValueError("Un embedding possède une norme nulle.")
 
         return vectors / norms
 
@@ -576,17 +506,12 @@ class BGEEmbedder:
         normalized = requested_device.strip().casefold()
 
         if normalized == "auto":
-            return (
-                "cuda:0"
-                if torch.cuda.is_available()
-                else "cpu"
-            )
+            return "cuda:0" if torch.cuda.is_available() else "cpu"
 
         if normalized.startswith("cuda"):
             if not torch.cuda.is_available():
                 raise RuntimeError(
-                    "CUDA a été demandé, mais aucun GPU CUDA "
-                    "n'est accessible par PyTorch."
+                    "CUDA a été demandé, mais aucun GPU CUDA n'est accessible par PyTorch."
                 )
 
             return requested_device
@@ -594,7 +519,4 @@ class BGEEmbedder:
         if normalized == "cpu":
             return "cpu"
 
-        raise ValueError(
-            "device doit être 'auto', 'cpu' ou une valeur "
-            "comme 'cuda:0'."
-        )
+        raise ValueError("device doit être 'auto', 'cpu' ou une valeur comme 'cuda:0'.")

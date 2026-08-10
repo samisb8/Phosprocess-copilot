@@ -39,11 +39,7 @@ def child_to_runtime_record(
 ) -> dict[str, Any]:
     """Expose hierarchy metadata through the existing chunk retrievers."""
 
-    heading_path = [
-        value
-        for value in (child.chapter, child.section, child.subsection)
-        if value
-    ]
+    heading_path = [value for value in (child.chapter, child.section, child.subsection) if value]
     return {
         "chunk_id": child.chunk_id,
         "document_id": child.document_id,
@@ -121,8 +117,7 @@ class QualityIndexBuilder:
         chunk_records = self.base_builder._read_jsonl(dense_metadata_path)
         chunk_vectors = np.load(chunk_vectors_path, allow_pickle=False)
         chunk_position = {
-            str(record["chunk_id"]): position
-            for position, record in enumerate(chunk_records)
+            str(record["chunk_id"]): position for position, record in enumerate(chunk_records)
         }
         section_vectors = np.empty(
             (
@@ -134,9 +129,7 @@ class QualityIndexBuilder:
 
         for position, section in enumerate(sections):
             missing = [
-                chunk_id
-                for chunk_id in section.child_chunk_ids
-                if chunk_id not in chunk_position
+                chunk_id for chunk_id in section.child_chunk_ids if chunk_id not in chunk_position
             ]
             if missing:
                 raise ValueError(
@@ -150,9 +143,7 @@ class QualityIndexBuilder:
             average = vectors.mean(axis=0)
             norm = float(np.linalg.norm(average))
             if norm <= 0:
-                raise ValueError(
-                    f"Embedding de section nul : {section.section_id}"
-                )
+                raise ValueError(f"Embedding de section nul : {section.section_id}")
             section_vectors[position] = average / norm
 
         section_root = version_directory / "sections"
@@ -161,9 +152,7 @@ class QualityIndexBuilder:
         dense_directory.mkdir(parents=True, exist_ok=False)
         bm25_directory.mkdir(parents=True, exist_ok=False)
 
-        dense_index = faiss.IndexFlatIP(
-            self.base_builder.embedding_config.embedding_dimension
-        )
+        dense_index = faiss.IndexFlatIP(self.base_builder.embedding_config.embedding_dimension)
         dense_index.add(np.ascontiguousarray(section_vectors, dtype=np.float32))
         faiss.write_index(dense_index, str(dense_directory / "index.faiss"))
         np.save(dense_directory / "embeddings.npy", section_vectors)
@@ -264,11 +253,7 @@ class QualityIndexBuilder:
                 parents_by_document[document_id],
                 maximum_child_tokens=maximum_child_tokens,
                 maximum_parent_tokens=maximum_parent_tokens,
-                sections=(
-                    sections_by_document[document_id]
-                    if hierarchical_enabled
-                    else None
-                ),
+                sections=(sections_by_document[document_id] if hierarchical_enabled else None),
             )
             hierarchy_summaries[document_id] = {
                 "children": summary.child_count,
@@ -312,9 +297,7 @@ class QualityIndexBuilder:
             json.dumps(
                 {
                     "catalog_version": QUALITY_INDEX_PIPELINE_VERSION,
-                    "documents": [
-                        document.model_dump(mode="json") for document in documents
-                    ],
+                    "documents": [document.model_dump(mode="json") for document in documents],
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -338,11 +321,7 @@ class QualityIndexBuilder:
             "section_count": len(effective_sections),
             "active_document_ids": sorted(document_by_id),
             "hierarchy_validation": hierarchy_summaries,
-            "retrieval_stages": (
-                ["section", "chunk"]
-                if effective_sections
-                else ["chunk"]
-            ),
+            "retrieval_stages": (["section", "chunk"] if effective_sections else ["chunk"]),
             "dense_format": "FAISS IndexFlatIP",
             "bm25_format": "bm25s directory",
             "runtime_compatibility": {

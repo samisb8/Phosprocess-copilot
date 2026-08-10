@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -15,6 +16,7 @@ from phosprocess.llm.ollama_client import (
     OllamaLLM,
     OllamaResponseValidationError,
     OllamaTimeoutError,
+    load_ollama_config,
 )
 from phosprocess.rag.schemas import GroundedAnswerPayload
 
@@ -153,3 +155,40 @@ def test_connection_failures_are_normalized(error: Exception) -> None:
             system_prompt="Système",
             response_model=GroundedAnswerPayload,
         )
+
+
+def test_ollama_host_environment_variable_overrides_yaml(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Allow Docker to override the local Ollama endpoint."""
+    config_path = tmp_path / "rag_production.yaml"
+    config_path.write_text(
+        """
+ollama:
+  host: http://localhost:11434
+  model: qwen-test
+  temperature: 0.1
+  context_size: 4096
+  max_output_tokens: 256
+  timeout_seconds: 3.0
+  keep_alive: 1m
+  seed: 0
+  num_gpu: 0
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    local_config = load_ollama_config(config_path)
+    assert local_config.host == "http://localhost:11434"
+
+    monkeypatch.setenv(
+        "OLLAMA_HOST",
+        "http://host.docker.internal:11434",
+    )
+    docker_config = load_ollama_config(config_path)
+
+    assert docker_config.host == (
+        "http://host.docker.internal:11434"
+    )

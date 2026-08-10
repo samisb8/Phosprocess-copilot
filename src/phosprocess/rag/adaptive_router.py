@@ -40,11 +40,10 @@ class AdaptiveRouteDecision:
         return self.path is RequestPath.DOMAIN_RAG
 
 
-_POLITE_PREFIX = (
-    r"(?:(?:peux[- ]tu|pouvez[- ]vous|can you|could you|please)\s+)?"
-)
+_POLITE_PREFIX = r"(?:(?:peux[- ]tu|pouvez[- ]vous|can you|could you|please)\s+)?"
 _TRANSLATION = re.compile(
-    r"^\s*" + _POLITE_PREFIX
+    r"^\s*"
+    + _POLITE_PREFIX
     + r"(?:me\s+)?(?:traduis|traduire|traduisez|translate|translation|ترجم)\b",
     re.IGNORECASE,
 )
@@ -62,32 +61,6 @@ _GREETING = re.compile(
     r"[\s!.?]*$",
     re.IGNORECASE,
 )
-_GENERAL_WITHOUT_RETRIEVAL = re.compile(
-    r"^\s*(?:question\s+g[eé]n[eé]rale\s*:\s*|general\s+question\s*:\s*|"
-    r"qui\s+est\b|who\s+is\b|quelle\s+est\s+la\s+capitale\b|"
-    r"what\s+is\s+the\s+capital\b|écris\s+(?:un|une)\b|"
-    r"write\s+(?:a|an)\b)",
-    re.IGNORECASE,
-)
-_DOMAIN_SIGNAL = re.compile(
-    r"\b(?:acide|acid|phosphorique|phosphoric|évaporateur|evaporator|"
-    r"pompe|pump|échangeur|exchanger|vapeur|steam|vapor|gypse|gypsum|"
-    r"filtration|cristallisation|crystallization|réacteur|reactor|"
-    r"thermodynamique|thermodynamic|enthalpie|enthalpy|pression|pressure|"
-    r"température|temperature|corrosion|fouling|scaling|boiler|bouilleur|"
-    r"bilan|balance|procédé|process|pid|mpc|contrôle|control)\b",
-    re.IGNORECASE,
-)
-_EXPLICIT_SOURCE_MODE = {
-    "becker",
-    "report",
-    "thermodynamics",
-    "heat_transfer",
-    "perry",
-    "crystallization",
-    "control",
-    "transport",
-}
 _TARGET_LANGUAGES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
@@ -139,19 +112,18 @@ def decide_request_path(
     *,
     source_mode: str = "auto",
 ) -> AdaptiveRouteDecision:
-    """Route before follow-up resolution can inject phosphoric context.
+    """Choose retrieval without embedding domain knowledge in the router.
 
-    The direct path is deliberately limited to self-contained language tasks
-    and greetings. Open factual questions continue through the grounded RAG
-    path unless a future explicit general-knowledge mode is introduced.
+    Only self-contained language transformations and greetings bypass the
+    documentary RAG. Every other factual or ambiguous request goes through
+    retrieval, where corpus evidence decides what is relevant.
     """
 
     normalized_mode = source_mode.strip().casefold()
-
     if normalized_mode == "automatic":
         normalized_mode = "auto"
 
-    if normalized_mode in _EXPLICIT_SOURCE_MODE:
+    if normalized_mode != "auto":
         return AdaptiveRouteDecision(
             path=RequestPath.DOMAIN_RAG,
             reason="explicit_document_scope",
@@ -184,16 +156,6 @@ def decide_request_path(
             path=RequestPath.DIRECT_LLM,
             reason="simple_conversation",
             direct_intent=DirectIntent.CONVERSATION,
-        )
-
-    if (
-        _GENERAL_WITHOUT_RETRIEVAL.search(question)
-        and not _DOMAIN_SIGNAL.search(question)
-    ):
-        return AdaptiveRouteDecision(
-            path=RequestPath.DIRECT_LLM,
-            reason="obvious_general_request",
-            direct_intent=DirectIntent.GENERAL,
         )
 
     return AdaptiveRouteDecision(

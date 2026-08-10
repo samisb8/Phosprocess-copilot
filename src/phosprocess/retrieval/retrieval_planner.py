@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from phosprocess.retrieval.technical_lexicon import TECHNICAL_EQUIVALENTS
+
 
 @dataclass(frozen=True, slots=True)
 class EvidenceRole:
@@ -18,7 +20,6 @@ class EvidenceRole:
 
     name: str
     query: str
-    required: bool = True
     subject: str | None = None
 
 
@@ -56,37 +57,22 @@ _COMPARISON_PATTERNS = (
     ),
 )
 
-_TECHNICAL_ENGLISH = (
-    (re.compile(r"\bévaporateur à circulation forcée\b", re.I), "forced-circulation evaporator"),
-    (re.compile(r"\bcirculation forcée\b", re.I), "forced circulation"),
-    (re.compile(r"\bfilm tombant\b", re.I), "falling-film evaporator"),
-    (re.compile(r"\bévaporateur\b", re.I), "evaporator"),
-    (re.compile(r"\bpompe de circulation\b", re.I), "circulation pump"),
-    (re.compile(r"\béchangeur(?: de chaleur| thermique)?\b", re.I), "heat exchanger"),
-    (re.compile(r"\bchambre de flash\b", re.I), "flash chamber"),
-    (re.compile(r"\bcorps de vapeur\b", re.I), "vapor body"),
-    (re.compile(r"\bacide phosphorique\b", re.I), "phosphoric acid"),
-    (re.compile(r"\bbilan\b", re.I), "balance"),
-    (re.compile(r"\brégime permanent\b", re.I), "steady state"),
-    (re.compile(r"\bencrassement\b", re.I), "fouling"),
-    (re.compile(r"\bentartrage\b", re.I), "scaling"),
-    (re.compile(r"غرفة التبخير"), "vapor body evaporation chamber"),
-    (re.compile(r"فصل البخار"), "vapor liquid separation"),
-    (re.compile(r"الحمض"), "acid"),
-    (re.compile(r"المبخر"), "evaporator"),
-)
-
 
 def _compact(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" \t\r\n,;:-")
 
 
 def _english_technical_projection(query: str) -> str:
+    """Project only terminology from the shared multilingual lexicon."""
+    normalized = query.casefold()
     additions: list[str] = []
-    for pattern, english in _TECHNICAL_ENGLISH:
-        if pattern.search(query) and english.casefold() not in query.casefold():
-            additions.append(english)
-    return " ".join(dict.fromkeys(additions))
+    for expression, equivalents in TECHNICAL_EQUIVALENTS.items():
+        if expression.casefold() not in normalized:
+            continue
+        for equivalent in equivalents:
+            if equivalent.casefold() not in normalized and equivalent not in additions:
+                additions.append(equivalent)
+    return " ".join(additions)
 
 
 def _extract_comparison_subjects(question: str) -> tuple[str, str] | None:
@@ -102,92 +88,42 @@ def _extract_comparison_subjects(question: str) -> tuple[str, str] | None:
 
 
 def _balance_kind(question: str) -> str:
+    """Classify a balance structurally without encoding document facts."""
+
     normalized = question.casefold().replace("₂", "2").replace("₅", "5")
-    p2o5 = "p2o5" in normalized
-    plant = any(
-        term in normalized
-        for term in (
-            "jfc4",
-            "echelon",
-            "échelon",
-            "rapport ocp",
-            "rapport atelier",
-            "ocp report",
-        )
-    )
-    if p2o5 and plant:
-        return "p2o5_plant"
-    if any(
-        term in normalized
-        for term in (
-            "p2o5",
-            "species",
-            "component",
-            "espèce",
-            "composant",
-        )
-    ):
-        return "species"
+
     energy_terms = (
         "energy",
         "heat",
         "enthalpy",
-        "énerg",
+        "energie",
+        "énergie",
         "thermique",
         "chaleur",
     )
     if any(term in normalized for term in energy_terms):
         return "energy"
-    return "overall_mass"
 
-
-def _normalized_intent_text(value: str) -> str:
-    return re.sub(r"\s+", " ", value.casefold().replace("’", "'")).strip()
-
-
-def _scoped_explanation_intent(value: str) -> str | None:
-    normalized = _normalized_intent_text(value)
-    pump = any(
-        marker in normalized
-        for marker in (
-            "circulation pump",
-            "pompe de circulation",
-            "مضخة الدوران",
-        )
+    species_terms = (
+        "species",
+        "component",
+        "constituent",
+        "espèce",
+        "espece",
+        "composant",
+        "constituant",
     )
-    if not pump:
-        return None
-    if any(
-        marker in normalized
-        for marker in (
-            "back to the flash chamber",
-            "send the liquid back",
-            "return to the flash chamber",
-            "ramener le liquide",
-            "renvoyer le liquide",
-            "إعاد",
-        )
+    if any(term in normalized for term in species_terms):
+        return "species"
+
+    # Generic chemical-formula detection, e.g. H2O, CO2, X2Y5.
+    if re.search(
+        r"\b[a-z]{1,3}\d+(?:[a-z]\d*)+\b",
+        normalized,
     ):
-        return "pump_return"
-    if any(
-        marker in normalized
-        for marker in (
-            "necessary",
-            "nécessaire",
-            "necessaire",
-            "why",
-            "pourquoi",
-            "ضرورية",
-            "لماذا",
-        )
-    ):
-        return "pump_necessity"
-    if any(
-        marker in normalized
-        for marker in ("role", "rôle", "fonction", "what does", "دور")
-    ):
-        return "pump_role"
-    return None
+        return "species"
+
+    return "overall_mass"
 
 
 def build_retrieval_plan(
@@ -196,281 +132,160 @@ def build_retrieval_plan(
     standalone_query: str,
     question_type: str,
 ) -> RetrievalPlan:
-    """Create deterministic evidence roles for the current question."""
+    """Create generic information-needs for retrieval.
+
+    Roles describe only the structure of information to search for.
+    They never encode the expected documentary answer.
+    """
 
     original = _compact(original_question)
     standalone = _compact(standalone_query)
+
     if not original or not standalone:
         raise ValueError("Les questions du plan de retrieval ne peuvent pas être vides.")
 
     projected = _english_technical_projection(f"{original} {standalone}")
     base_query = _compact(" ".join(part for part in (standalone, projected) if part))
 
-    if question_type == "definition":
-        roles = (
-            EvidenceRole(
-                "definition_nature",
-                f"{base_query} forced circulation evaporator equipment definition",
-                required=False,
-            ),
-            EvidenceRole(
-                "definition_mechanism",
-                f"{base_query} acid circulation pump heat exchanger pressure drop "
-                "large flow heating surface",
-            ),
-            EvidenceRole(
-                "definition_function",
-                f"{base_query} vapor body hot acid from heat exchanger "
-                "vapor liquid separation evaporation chamber",
-            ),
-        )
-        return RetrievalPlan(
-            question_type=question_type,
-            base_query=base_query,
-            roles=roles,
-            answer_intent="definition",
-        )
-
-    if question_type == "explanation":
-        intent = _scoped_explanation_intent(base_query)
-        if intent == "pump_necessity":
-            roles = (
-                EvidenceRole(
-                    "pump_circulation",
-                    f"{base_query} forced positive circulation independent evaporation rate",
-                ),
-                EvidenceRole(
-                    "pump_heating_path",
-                    f"{base_query} pump liquid through heating surface heat exchanger",
-                ),
-                EvidenceRole(
-                    "pump_process_function",
-                    f"{base_query} heat transfer vapor liquid separation separate functions",
-                    required=False,
-                ),
-            )
-            return RetrievalPlan(
-                question_type,
-                base_query,
-                roles,
-                answer_intent=intent,
-            )
-        if intent == "pump_role":
-            roles = (
-                EvidenceRole(
-                    "pump_withdrawal",
-                    f"{base_query} pump withdraws liquor from flash chamber",
-                    required=False,
-                ),
-                EvidenceRole(
-                    "pump_heating_path",
-                    f"{base_query} pump forces liquid through heating element",
-                ),
-                EvidenceRole(
-                    "pump_process_function",
-                    f"{base_query} heat transfer vapor liquid separation separate functions",
-                    required=False,
-                ),
-            )
-            return RetrievalPlan(
-                question_type,
-                base_query,
-                roles,
-                answer_intent=intent,
-            )
-        if intent == "pump_return":
-            roles = (
-                EvidenceRole(
-                    "pump_return_path",
-                    f"{base_query} withdraw flash chamber heating element back to flash chamber",
-                ),
-            )
-            return RetrievalPlan(
-                question_type,
-                base_query,
-                roles,
-                answer_intent=intent,
-            )
-
-    if question_type == "momentum_diffusion":
-        roles = (
-            EvidenceRole(
-                "momentum_transport",
-                f"{base_query} molecular transport of momentum momentum flux",
-            ),
-            EvidenceRole(
-                "velocity_gradient",
-                f"{base_query} velocity gradient adjacent fluid layers",
-            ),
-            EvidenceRole(
-                "newton_viscosity_law",
-                f"{base_query} Newton law of viscosity shear stress viscosity",
-            ),
-        )
-        return RetrievalPlan(
-            question_type=question_type,
-            base_query=base_query,
-            roles=roles,
-            answer_intent="momentum_diffusion",
+    def role(
+        name: str,
+        hint: str,
+        *,
+        subject: str | None = None,
+    ) -> EvidenceRole:
+        query = _compact(f"{base_query} {hint}")
+        return EvidenceRole(
+            name=name,
+            query=query,
+            subject=subject,
         )
 
     if question_type == "comparison":
-        subjects = (
-            _extract_comparison_subjects(original)
-            or _extract_comparison_subjects(standalone)
+        subjects = _extract_comparison_subjects(original) or _extract_comparison_subjects(
+            standalone
         )
+
         if subjects is None:
             return RetrievalPlan(
                 question_type=question_type,
                 base_query=base_query,
-                roles=(EvidenceRole("comparison_context", base_query),),
+                roles=(
+                    role(
+                        "comparison_context",
+                        "comparison similarities differences criteria",
+                    ),
+                ),
             )
+
         subject_a, subject_b = subjects
-        roles = (
-            EvidenceRole(
-                "equipment_a",
-                f"{subject_a} operation design applications heat transfer "
-                "fouling viscosity residence time",
-                subject=subject_a,
-            ),
-            EvidenceRole(
-                "equipment_b",
-                f"{subject_b} operation design applications heat transfer "
-                "fouling viscosity residence time",
-                subject=subject_b,
-            ),
-            EvidenceRole(
-                "comparison_criteria",
-                f"{subject_a} {subject_b} comparison heat transfer fouling "
-                "scaling viscosity residence time circulation",
-                subject=f"{subject_a} versus {subject_b}",
-            ),
-        )
+
         return RetrievalPlan(
             question_type=question_type,
             base_query=base_query,
-            roles=roles,
+            roles=(
+                role(
+                    "subject_a",
+                    subject_a,
+                    subject=subject_a,
+                ),
+                role(
+                    "subject_b",
+                    subject_b,
+                    subject=subject_b,
+                ),
+                role(
+                    "comparison_criteria",
+                    "comparison criteria similarities differences",
+                ),
+            ),
             comparison_subjects=subjects,
         )
 
-    if question_type == "balance":
-        kind = _balance_kind(base_query)
-        if kind == "p2o5_plant":
-            roles = (
-                EvidenceRole(
-                    "p2o5_conservation",
-                    f"{base_query} bilan matière global P2O5 ligne 1 ligne 5 ligne 6",
-                    required=False,
-                ),
-                EvidenceRole(
-                    "p2o5_feed",
-                    f"{base_query} ligne 1 entrée acide débit P2O5 alimentation "
-                    "18.03 t/h 18030 kg/h",
-                ),
-                EvidenceRole(
-                    "p2o5_product",
-                    f"{base_query} ligne 5 sortie acide débit P2O5 produit "
-                    "18 t/h 18000 kg/h",
-                ),
-                EvidenceRole(
-                    "p2o5_entrainment",
-                    f"{base_query} ligne 6 sortie bouilleur P2O5 entraîné gaz "
-                    "30 kg/h",
-                ),
-            )
-        elif kind == "species":
-            roles = (
-                EvidenceRole(
-                    "species_conservation",
-                    "steady-state conservation law for a chemical species "
-                    "component balance equation",
-                ),
-                EvidenceRole(
-                    "species_feed",
-                    f"{base_query} P2O5 feed flow concentration component inlet",
-                ),
-                EvidenceRole(
-                    "species_product",
-                    f"{base_query} P2O5 concentrated product flow concentration outlet",
-                ),
-                EvidenceRole(
-                    "species_losses",
-                    f"{base_query} P2O5 vapor entrainment losses carryover evaporator",
-                ),
-            )
-        elif kind == "energy":
-            roles = (
-                EvidenceRole(
-                    "energy_conservation",
-                    "steady-state control-volume energy conservation equation "
-                    "enthalpy in out heat work",
-                ),
-                EvidenceRole(
-                    "heat_input",
-                    f"{base_query} evaporator steam duty heating medium heat input",
-                ),
-                EvidenceRole(
-                    "feed_product_enthalpy",
-                    f"{base_query} feed enthalpy concentrated product enthalpy",
-                ),
-                EvidenceRole(
-                    "vapor_enthalpy",
-                    f"{base_query} water vapor latent heat vapor enthalpy evaporation",
-                ),
-            )
-        else:
-            roles = (
-                EvidenceRole(
-                    "overall_conservation",
-                    "steady-state overall mass balance mass in mass out accumulation generation",
-                ),
-                EvidenceRole(
-                    "feed_stream",
-                    f"{base_query} feed stream mass flow inlet",
-                ),
-                EvidenceRole(
-                    "product_and_vapor",
-                    f"{base_query} concentrated liquid product vapor outlet mass flow",
-                ),
-            )
-        return RetrievalPlan(
-            question_type=question_type,
-            base_query=base_query,
-            roles=roles,
-            balance_kind=kind,
-        )
+    role_hints: dict[str, tuple[tuple[str, str], ...]] = {
+        "definition": (
+            ("definition", "definition nature"),
+            ("mechanism", "mechanism operation"),
+            ("function", "function purpose"),
+        ),
+        "explanation": (
+            ("core_explanation", "explanation mechanism"),
+            ("relations", "relationships causes effects"),
+        ),
+        "process_flow": (
+            ("sequence_overview", "process sequence flow path"),
+            ("entry_context", "entry inlet beginning"),
+            (
+                "transitions",
+                "transitions connections intermediate stages",
+            ),
+            ("exit_context", "exit outlet end"),
+        ),
+        "procedure": (
+            ("prerequisites", "prerequisites initial conditions"),
+            ("ordered_actions", "ordered actions procedure sequence"),
+            ("outcome", "result outcome completion"),
+        ),
+        "balance": (
+            ("governing_relation", "conservation relation balance equation"),
+            ("inputs", "input quantities variables"),
+            ("outputs", "output quantities variables"),
+            ("assumptions_units", "assumptions units basis"),
+        ),
+        "equation_explanation": (
+            ("governing_relation", "governing relation equation"),
+            ("variables", "variables symbols definitions"),
+            ("assumptions", "assumptions applicability"),
+        ),
+        "thermodynamic_relation": (
+            ("governing_relation", "governing relation equation"),
+            ("variables", "variables properties definitions"),
+            ("conditions", "conditions assumptions applicability"),
+        ),
+        "calculation": (
+            ("governing_relation", "governing relation calculation"),
+            ("inputs", "input values variables units"),
+            ("method", "calculation method"),
+        ),
+        "troubleshooting": (
+            ("symptom", "observed symptom problem"),
+            ("causes", "possible documented causes"),
+            ("mechanism", "physical mechanism"),
+            ("effects", "documented effects consequences"),
+            ("actions", "documented corrective actions mitigation"),
+        ),
+        "momentum_diffusion": (
+            ("concept", "definition concept"),
+            ("governing_relation", "governing relation"),
+            ("variables", "variables physical meaning"),
+        ),
+        "control_strategy": (
+            ("objective", "control objective"),
+            ("observations", "measured observed variables"),
+            ("actions", "control actions manipulated variables"),
+            ("strategy", "control strategy operation"),
+        ),
+        "table_question": (("table_context", "table data values units"),),
+        "plant_specific": (
+            ("plant_context", "documented plant context data"),
+            ("requested_fact", "requested documented information"),
+        ),
+    }
 
-    if question_type == "troubleshooting":
-        roles = (
-            EvidenceRole("cause", f"{base_query} documented causes"),
-            EvidenceRole("mechanism", f"{base_query} physical mechanism"),
-            EvidenceRole("effect", f"{base_query} documented operational effects performance loss"),
-            EvidenceRole("action", f"{base_query} documented mitigation cleaning operating action"),
-        )
-        return RetrievalPlan(question_type, base_query, roles)
+    hints = role_hints.get(question_type)
 
-    if question_type == "process_flow":
+    if hints is None:
         roles = (
-            EvidenceRole("feed_inlet", f"{base_query} feed inlet"),
-            EvidenceRole(
-                "conical_bottom",
-                f"{base_query} cycling acid leaves vapor body conical bottom",
+            role(
+                "primary",
+                "relevant supporting evidence",
             ),
-            EvidenceRole(
-                "pump_heat_exchanger",
-                f"{base_query} circulation pump heating element heat exchanger",
-            ),
-            EvidenceRole(
-                "vapor_body",
-                f"{base_query} vapor body flash chamber vapor liquid separation",
-            ),
-            EvidenceRole("recirculation", f"{base_query} return recirculation loop flash chamber"),
-            EvidenceRole("product_outlet", f"{base_query} concentrated product withdrawal outlet"),
         )
-        return RetrievalPlan(question_type, base_query, roles)
+    else:
+        roles = tuple(role(name, hint) for name, hint in hints)
 
     return RetrievalPlan(
         question_type=question_type,
         base_query=base_query,
-        roles=(EvidenceRole("primary", base_query),),
+        roles=roles,
+        balance_kind=(_balance_kind(base_query) if question_type == "balance" else None),
     )

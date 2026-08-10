@@ -99,7 +99,8 @@ class TechnicalChunkingConfig:
 
     def __post_init__(self) -> None:
         if not (
-            0 < self.child_minimum_tokens
+            0
+            < self.child_minimum_tokens
             <= self.child_target_tokens
             <= self.child_maximum_tokens
             < self.parent_target_tokens
@@ -172,11 +173,7 @@ class TechnicalDocumentChunker:
 
         for item in chunk.meta.doc_items:
             label = getattr(item, "label", None)
-            labels.add(
-                str(label.value)
-                if hasattr(label, "value")
-                else str(label or "unknown")
-            )
+            labels.add(str(label.value) if hasattr(label, "value") else str(label or "unknown"))
 
             for provenance in getattr(item, "prov", None) or ():
                 pages.add(int(provenance.page_no))
@@ -207,16 +204,10 @@ class TechnicalDocumentChunker:
         if DocItemLabel.TABLE.value in label_set:
             return TechnicalChunkType.TABLE
 
-        if (
-            DocItemLabel.FORMULA.value in label_set
-            or _FORMULA_PLACEHOLDER.search(text)
-        ):
+        if DocItemLabel.FORMULA.value in label_set or _FORMULA_PLACEHOLDER.search(text):
             return TechnicalChunkType.EQUATION
 
-        if (
-            DocItemLabel.CAPTION.value in label_set
-            or DocItemLabel.PICTURE.value in label_set
-        ):
+        if DocItemLabel.CAPTION.value in label_set or DocItemLabel.PICTURE.value in label_set:
             return TechnicalChunkType.FIGURE_CAPTION
 
         if _EXERCISE.search(context):
@@ -301,15 +292,10 @@ class TechnicalDocumentChunker:
             page_number = int(page["page_number"])
             token_ids = self.tokenizer.encode(text, add_special_tokens=False)
 
-            step = (
-                self.config.child_target_tokens
-                - self.config.overlap_tokens
-            )
+            step = self.config.child_target_tokens - self.config.overlap_tokens
 
             for offset in range(0, len(token_ids), step):
-                piece_ids = token_ids[
-                    offset : offset + self.config.child_target_tokens
-                ]
+                piece_ids = token_ids[offset : offset + self.config.child_target_tokens]
                 piece = self.tokenizer.decode(
                     piece_ids,
                     skip_special_tokens=True,
@@ -368,11 +354,7 @@ class TechnicalDocumentChunker:
     ) -> str:
         values = [
             entry.display_title,
-            *(
-                value
-                for value in (chapter, section, subsection)
-                if value
-            ),
+            *(value for value in (chapter, section, subsection) if value),
         ]
         return " > ".join(values)
 
@@ -411,9 +393,7 @@ class TechnicalDocumentChunker:
         entry: DocumentCatalogEntry,
         draft: _Draft,
     ) -> str:
-        chapter, section, subsection = TechnicalDocumentChunker._heading_fields(
-            draft.headings
-        )
+        chapter, section, subsection = TechnicalDocumentChunker._heading_fields(draft.headings)
         hierarchy_path = TechnicalDocumentChunker._hierarchy_path(
             entry=entry,
             chapter=chapter,
@@ -464,10 +444,7 @@ class TechnicalDocumentChunker:
             if not any((chapter, section, subsection)):
                 block_start = ((draft.pages[0] - 1) // 5) * 5 + 1
                 block_end = block_start + 4
-                hierarchy_path = (
-                    f"{hierarchy_path} > Unlabelled pages "
-                    f"{block_start}-{block_end}"
-                )
+                hierarchy_path = f"{hierarchy_path} > Unlabelled pages {block_start}-{block_end}"
             section_digest = self._stable_digest(
                 entry.document_id,
                 hierarchy_path,
@@ -504,9 +481,7 @@ class TechnicalDocumentChunker:
                         entry=entry,
                         draft=draft,
                         previous_text=(
-                            previous_text
-                            if previous_headings == draft.headings
-                            else None
+                            previous_text if previous_headings == draft.headings else None
                         ),
                     ),
                     bm25_text=self._bm25_text(entry=entry, draft=draft),
@@ -539,9 +514,7 @@ class TechnicalDocumentChunker:
             if current and (
                 key != current_key
                 or candidate_tokens > self.config.parent_maximum_tokens
-                or self.count_tokens(
-                    "\n\n".join(item.display_text for item in current)
-                )
+                or self.count_tokens("\n\n".join(item.display_text for item in current))
                 >= self.config.parent_target_tokens
             ):
                 groups.append(current)

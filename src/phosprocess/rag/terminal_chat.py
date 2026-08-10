@@ -149,7 +149,8 @@ def print_sources(
 
     for source in sources:
         print(
-            "  " + format_source(source, detailed=detailed).replace(
+            "  "
+            + format_source(source, detailed=detailed).replace(
                 "\n",
                 "\n  ",
             ),
@@ -169,18 +170,15 @@ def print_latency_table(
         return
 
     print(
-        "Politique documentaire : "
-        f"{metrics.get('source_policy_route', 'indisponible')}",
+        f"Politique documentaire : {metrics.get('source_policy_route', 'indisponible')}",
         file=output,
     )
     print(
-        "Source prioritaire : "
-        f"{metrics.get('source_policy_primary', 'indisponible')}",
+        f"Source prioritaire : {metrics.get('source_policy_primary', 'indisponible')}",
         file=output,
     )
     print(
-        "Fallback utilisé : "
-        f"{'oui' if metrics.get('source_policy_fallback_used') else 'non'}",
+        f"Fallback utilisé : {'oui' if metrics.get('source_policy_fallback_used') else 'non'}",
         file=output,
     )
 
@@ -253,10 +251,7 @@ def handle_command(
     if normalized == "/history":
         if not state.history_enabled:
             print("Historique désactivé (--no-history).", file=output)
-        elif (
-            not state.memory.get_recent_turns()
-            and not state.memory.get_summary()
-        ):
+        elif not state.memory.get_recent_turns() and not state.memory.get_summary():
             print("Historique vide.", file=output)
         else:
             debug = state.memory.export_debug_view()
@@ -441,8 +436,7 @@ class TerminalChat:
                         file=self.output,
                     )
                     print(
-                        "  autonome="
-                        f"{event.metadata.get('standalone_query', question)}",
+                        f"  autonome={event.metadata.get('standalone_query', question)}",
                         file=self.output,
                     )
                     print(
@@ -451,15 +445,12 @@ class TerminalChat:
                         file=self.output,
                     )
                     print(
-                        "  domaines="
-                        f"{event.metadata.get('source_policy_route', '')}",
+                        f"  domaines={event.metadata.get('source_policy_route', '')}",
                         file=self.output,
                     )
 
                 elif event.event_type == "retrieval_completed":
-                    retrieval_skipped = bool(
-                        event.metadata.get("retrieval_skipped")
-                    )
+                    retrieval_skipped = bool(event.metadata.get("retrieval_skipped"))
                     if self.show_query or self.state.debug_enabled:
                         added_terms = event.metadata.get(
                             "query_expansion",
@@ -514,9 +505,7 @@ class TerminalChat:
                         )
 
                 elif event.event_type == "token":
-                    attempt = str(
-                        event.metadata.get("attempt", "initial")
-                    )
+                    attempt = str(event.metadata.get("attempt", "initial"))
 
                     if attempt != active_attempt:
                         if active_attempt is not None:
@@ -555,15 +544,12 @@ class TerminalChat:
 
                     completed_answer = response.answer
                     if response.standalone_query is not None:
-                        self.state.memory.state.record_resolution(
-                            response.standalone_query
-                        )
+                        self.state.memory.state.record_resolution(response.standalone_query)
 
                     if response.response_language is not None:
                         self.state.memory.state.record_response(
                             cited_documents=tuple(
-                                source.document_name
-                                for source in response.sources
+                                source.document_name for source in response.sources
                             ),
                             language=response.response_language,
                         )
@@ -579,9 +565,7 @@ class TerminalChat:
                         )
                     first_token_ms = response.timings.first_token_ms
                     first_token_text = (
-                        f"{first_token_ms / 1000.0:.2f} s"
-                        if first_token_ms is not None
-                        else "n/a"
+                        f"{first_token_ms / 1000.0:.2f} s" if first_token_ms is not None else "n/a"
                     )
                     print(
                         "Latence premier token : "
@@ -614,9 +598,7 @@ class TerminalChat:
             return
 
         if history_context.business_state is not None:
-            self.state.memory.synchronize_business_state(
-                history_context.business_state
-            )
+            self.state.memory.synchronize_business_state(history_context.business_state)
 
         if completed_answer is not None:
             self.state.memory.add_turn(question, completed_answer)
@@ -627,9 +609,7 @@ class TerminalChat:
         print(file=self.output)
 
         try:
-            answer = self.input_function(
-                "Quitter PhosProcess Copilot ? [o/N] "
-            )
+            answer = self.input_function("Quitter PhosProcess Copilot ? [o/N] ")
         except (EOFError, KeyboardInterrupt):
             print(file=self.output)
             return True

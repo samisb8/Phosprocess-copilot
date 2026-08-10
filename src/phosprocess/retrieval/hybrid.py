@@ -13,227 +13,7 @@ import yaml
 from phosprocess.preprocessing.chunk_schemas import DocumentChunk
 from phosprocess.retrieval.bm25 import BM25Retriever
 from phosprocess.retrieval.dense import DenseRetriever
-
-_QUERY_EXPANSIONS_V1: tuple[
-    tuple[str, tuple[str, ...]],
-    ...,
-] = (
-    (
-        "rapport de recirculation externe",
-        ("external recirculation ratio",),
-    ),
-    (
-        "rapport de recirculation interne",
-        ("internal recirculation ratio",),
-    ),
-    (
-        "recirculation externe",
-        ("external recirculation",),
-    ),
-    (
-        "recirculation interne",
-        ("internal recirculation",),
-    ),
-    (
-        "reacteur jacobs",
-        ("jacobs reactor",),
-    ),
-    (
-        "procede jacobs",
-        ("jacobs process",),
-    ),
-    (
-        "filtrabilite",
-        ("filterability", "filtration"),
-    ),
-    (
-        "cristaux de gypse",
-        ("gypsum crystals",),
-    ),
-    (
-        "gypse",
-        ("gypsum",),
-    ),
-    (
-        "acide phosphorique",
-        ("phosphoric acid",),
-    ),
-    (
-        "acide sulfurique",
-        ("sulfuric acid",),
-    ),
-    (
-        "phosphate naturel",
-        ("phosphate rock",),
-    ),
-    (
-        "roche phosphatee",
-        ("phosphate rock",),
-    ),
-    (
-        "taux de sulfate",
-        ("sulfate concentration",),
-    ),
-(
-    "forte supersaturation",
-    ("high supersaturation", "hypersaturation"),
-),
-(
-    "supersaturation",
-    ("supersaturation", "hypersaturation"),
-),
-(
-    "petits cristaux",
-    ("small crystals",),
-),
-(
-    "difficiles a filtrer",
-    ("poor filtration", "poor filterability"),
-),
-(
-    "filtrer",
-    ("filtration", "filterability"),
-),
-)
-
-
-_QUERY_EXPANSIONS_V2: tuple[
-    tuple[str, tuple[str, ...]],
-    ...,
-] = _QUERY_EXPANSIONS_V1 + (
-    (
-        "procede humide",
-        (
-            "wet process",
-            "wet-process phosphoric acid",
-        ),
-    ),
-    (
-        "pertes de p2o5",
-        (
-            "P2O5 losses",
-            "phosphate losses",
-            "co-crystallized losses",
-            "lattice losses",
-            "cake impregnation losses",
-            "unattacked P2O5",
-            "mechanical losses",
-            "sludge removal losses",
-        ),
-    ),
-    (
-        "categories de pertes",
-        (
-            "loss categories",
-            "co-crystallized losses",
-            "lattice losses",
-            "cake impregnation losses",
-            "unattacked P2O5",
-            "mechanical losses",
-            "sludge removal losses",
-        ),
-    ),
-    (
-        "pertes par impregnation",
-        (
-            "cake impregnation losses",
-            "filtration losses",
-        ),
-    ),
-    (
-        "impregnation du gateau",
-        (
-            "cake impregnation losses",
-            "filtration losses",
-        ),
-    ),
-    (
-        "pertes co-cristallisees",
-        (
-            "co-crystallized losses",
-            "lattice losses",
-        ),
-    ),
-    (
-        "roche non attaquee",
-        (
-            "unattacked P2O5",
-            "unreacted rock losses",
-        ),
-    ),
-    (
-        "pertes mecaniques",
-        ("mechanical losses",),
-    ),
-    (
-        "elimination des boues",
-        ("sludge removal losses",),
-    ),
-    (
-        "clarification intermediaire",
-        (
-            "intermediate clearing",
-            "intermediate clarification",
-            "intermediate settling",
-            "intermediate concentration about 40% P2O5",
-        ),
-    ),
-    (
-        "decantation intermediaire",
-        (
-            "intermediate clearing",
-            "intermediate settling",
-        ),
-    ),
-    (
-        "40 % p2o5",
-        (
-            "40% P2O5",
-            "intermediate concentration about 40% P2O5",
-        ),
-    ),
-    (
-        "40% p2o5",
-        (
-            "40% P2O5",
-            "intermediate concentration about 40% P2O5",
-        ),
-    ),
-    (
-        "50-52 % p2o5",
-        (
-            "50-52% P2O5",
-            "final concentration",
-            "final settling",
-        ),
-    ),
-    (
-        "clarification uniquement",
-        (
-            "final clarification",
-            "final settling",
-        ),
-    ),
-    (
-        "p2o5 losses",
-        (
-            "pertes de P2O5",
-            "co-crystallized losses",
-            "cake impregnation losses",
-            "unattacked P2O5",
-            "mechanical losses",
-            "sludge removal losses",
-        ),
-    ),
-    (
-        "intermediate clarification",
-        (
-            "clarification interm?diaire",
-            "intermediate clearing",
-            "intermediate settling",
-        ),
-    ),
-)
+from phosprocess.retrieval.technical_lexicon import TECHNICAL_EQUIVALENTS
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,47 +39,32 @@ class HybridConfig:
         """Valider les paramètres."""
 
         if self.fusion_method != "rrf":
-            raise ValueError(
-                "Seule la méthode de fusion 'rrf' est prise en charge."
-            )
+            raise ValueError("Seule la méthode de fusion 'rrf' est prise en charge.")
 
         if self.dense_candidate_k <= 0:
-            raise ValueError(
-                "dense_candidate_k doit être strictement positif."
-            )
+            raise ValueError("dense_candidate_k doit être strictement positif.")
 
         if self.bm25_candidate_k <= 0:
-            raise ValueError(
-                "bm25_candidate_k doit être strictement positif."
-            )
+            raise ValueError("bm25_candidate_k doit être strictement positif.")
 
         if self.default_top_k <= 0:
-            raise ValueError(
-                "default_top_k doit être strictement positif."
-            )
+            raise ValueError("default_top_k doit être strictement positif.")
 
         if self.rrf_k < 0:
-            raise ValueError(
-                "rrf_k doit être positif ou nul."
-            )
+            raise ValueError("rrf_k doit être positif ou nul.")
 
         if self.dense_weight <= 0:
-            raise ValueError(
-                "dense_weight doit être strictement positif."
-            )
+            raise ValueError("dense_weight doit être strictement positif.")
 
         if self.bm25_weight <= 0:
-            raise ValueError(
-                "bm25_weight doit être strictement positif."
-            )
+            raise ValueError("bm25_weight doit être strictement positif.")
 
         if self.query_expansion_version not in {
             "phosphoric_v1",
             "phosphoric_v2",
         }:
             raise ValueError(
-                "Version d'expansion lexicale inconnue : "
-                f"{self.query_expansion_version}"
+                f"Version d'expansion lexicale inconnue : {self.query_expansion_version}"
             )
 
 
@@ -376,25 +141,17 @@ def load_hybrid_config(
     """Lire la section hybrid de retrieval.yaml."""
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Configuration introuvable : {config_path}"
-        )
+        raise FileNotFoundError(f"Configuration introuvable : {config_path}")
 
-    raw_config = yaml.safe_load(
-        config_path.read_text(encoding="utf-8")
-    )
+    raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(raw_config, dict):
-        raise ValueError(
-            "Le fichier retrieval.yaml est invalide."
-        )
+        raise ValueError("Le fichier retrieval.yaml est invalide.")
 
     hybrid_config = raw_config.get("hybrid")
 
     if not isinstance(hybrid_config, dict):
-        raise ValueError(
-            "La section 'hybrid' est absente ou invalide."
-        )
+        raise ValueError("La section 'hybrid' est absente ou invalide.")
 
     return HybridConfig(
         fusion_method=str(
@@ -403,24 +160,12 @@ def load_hybrid_config(
                 "rrf",
             )
         ),
-        dense_candidate_k=int(
-            hybrid_config["dense_candidate_k"]
-        ),
-        bm25_candidate_k=int(
-            hybrid_config["bm25_candidate_k"]
-        ),
-        default_top_k=int(
-            hybrid_config["default_top_k"]
-        ),
-        rrf_k=int(
-            hybrid_config["rrf_k"]
-        ),
-        dense_weight=float(
-            hybrid_config["dense_weight"]
-        ),
-        bm25_weight=float(
-            hybrid_config["bm25_weight"]
-        ),
+        dense_candidate_k=int(hybrid_config["dense_candidate_k"]),
+        bm25_candidate_k=int(hybrid_config["bm25_candidate_k"]),
+        default_top_k=int(hybrid_config["default_top_k"]),
+        rrf_k=int(hybrid_config["rrf_k"]),
+        dense_weight=float(hybrid_config["dense_weight"]),
+        bm25_weight=float(hybrid_config["bm25_weight"]),
         lexical_query_expansion=bool(
             hybrid_config.get(
                 "lexical_query_expansion",
@@ -453,9 +198,7 @@ def normalize_query_for_matching(
     )
 
     normalized = "".join(
-        character
-        for character in normalized
-        if not unicodedata.combining(character)
+        character for character in normalized if not unicodedata.combining(character)
     )
 
     normalized = normalized.casefold()
@@ -472,40 +215,23 @@ def expand_lexical_query(
     *,
     version: str = "phosphoric_v1",
 ) -> str:
-    """Ajouter des ?quivalents terminologiques pour BM25."""
+    """Add terminology equivalents only; never inject expected answer facts."""
+    # Legacy version names are accepted for configuration compatibility.
+    if version not in {"phosphoric_v1", "phosphoric_v2", "technical_lexicon"}:
+        raise ValueError(f"Version d'expansion inconnue : {version}")
 
-    if version == "phosphoric_v1":
-        expansion_table = _QUERY_EXPANSIONS_V1
-    elif version == "phosphoric_v2":
-        expansion_table = _QUERY_EXPANSIONS_V2
-    else:
-        raise ValueError(
-            f"Version d'expansion inconnue : {version}"
-        )
-
-    normalized_query = normalize_query_for_matching(
-        query
-    )
-
+    normalized_query = normalize_query_for_matching(query)
     expansions: list[str] = []
-
-    for source_phrase, target_phrases in expansion_table:
-        if source_phrase not in normalized_query:
+    for source_phrase, target_phrases in TECHNICAL_EQUIVALENTS.items():
+        normalized_source = normalize_query_for_matching(source_phrase)
+        if normalized_source not in normalized_query:
             continue
-
         for target_phrase in target_phrases:
+            if normalize_query_for_matching(target_phrase) in normalized_query:
+                continue
             if target_phrase not in expansions:
                 expansions.append(target_phrase)
-
-    if not expansions:
-        return query.strip()
-
-    return " ".join(
-        [
-            query.strip(),
-            *expansions,
-        ]
-    )
+    return " ".join([query.strip(), *expansions]).strip()
 
 
 class HybridRetriever:
@@ -519,13 +245,9 @@ class HybridRetriever:
         embedding_config_path: Path,
         retrieval_config_path: Path,
     ) -> None:
-        self.retrieval_config_path = (
-            retrieval_config_path.resolve()
-        )
+        self.retrieval_config_path = retrieval_config_path.resolve()
 
-        self.config = load_hybrid_config(
-            self.retrieval_config_path
-        )
+        self.config = load_hybrid_config(self.retrieval_config_path)
 
         print("Chargement du retriever dense...")
 
@@ -566,42 +288,26 @@ class HybridRetriever:
         cleaned_query = query.strip()
 
         if not cleaned_query:
-            raise ValueError(
-                "La requête hybride ne peut pas être vide."
-            )
+            raise ValueError("La requête hybride ne peut pas être vide.")
 
-        effective_top_k = (
-            self.config.default_top_k
-            if top_k is None
-            else top_k
-        )
+        effective_top_k = self.config.default_top_k if top_k is None else top_k
 
         effective_dense_k = (
-            self.config.dense_candidate_k
-            if dense_candidate_k is None
-            else dense_candidate_k
+            self.config.dense_candidate_k if dense_candidate_k is None else dense_candidate_k
         )
 
         effective_bm25_k = (
-            self.config.bm25_candidate_k
-            if bm25_candidate_k is None
-            else bm25_candidate_k
+            self.config.bm25_candidate_k if bm25_candidate_k is None else bm25_candidate_k
         )
 
         if effective_top_k <= 0:
-            raise ValueError(
-                "top_k doit être strictement positif."
-            )
+            raise ValueError("top_k doit être strictement positif.")
 
         if effective_dense_k <= 0:
-            raise ValueError(
-                "dense_candidate_k doit être positif."
-            )
+            raise ValueError("dense_candidate_k doit être positif.")
 
         if effective_bm25_k <= 0:
-            raise ValueError(
-                "bm25_candidate_k doit être positif."
-            )
+            raise ValueError("bm25_candidate_k doit être positif.")
 
         expansion_enabled = (
             self.config.lexical_query_expansion
@@ -612,9 +318,7 @@ class HybridRetriever:
         lexical_query = (
             expand_lexical_query(
                 cleaned_query,
-                version=(
-                    self.config.query_expansion_version
-                ),
+                version=(self.config.query_expansion_version),
             )
             if expansion_enabled
             else cleaned_query
@@ -680,9 +384,7 @@ class HybridRetriever:
             )
         ]
 
-        total_duration_ms = (
-            time.perf_counter() - total_start
-        ) * 1000
+        total_duration_ms = (time.perf_counter() - total_start) * 1000
 
         return HybridSearchResponse(
             query=cleaned_query,
@@ -690,19 +392,11 @@ class HybridRetriever:
             top_k_requested=effective_top_k,
             dense_candidates_requested=effective_dense_k,
             bm25_candidates_requested=effective_bm25_k,
-            dense_results_found=len(
-                dense_response.results
-            ),
-            bm25_results_found=len(
-                bm25_response.results
-            ),
+            dense_results_found=len(dense_response.results),
+            bm25_results_found=len(bm25_response.results),
             fusion_candidates=len(candidates),
-            dense_duration_ms=(
-                dense_response.search_duration_ms
-            ),
-            bm25_duration_ms=(
-                bm25_response.search_duration_ms
-            ),
+            dense_duration_ms=(dense_response.search_duration_ms),
+            bm25_duration_ms=(bm25_response.search_duration_ms),
             total_duration_ms=round(
                 total_duration_ms,
                 3,
@@ -716,13 +410,9 @@ class HybridRetriever:
     ) -> tuple[float, int, int, str]:
         """Produire un ordre stable et déterministe."""
 
-        rrf_score = self._calculate_rrf_score(
-            candidate
-        )
+        rrf_score = self._calculate_rrf_score(candidate)
 
-        matched_retrievers = int(
-            candidate.dense_rank is not None
-        ) + int(
+        matched_retrievers = int(candidate.dense_rank is not None) + int(
             candidate.bm25_rank is not None
         )
 
@@ -790,23 +480,14 @@ class HybridRetriever:
 
         return HybridSearchResult(
             rank=final_rank,
-            rrf_score=(
-                dense_contribution
-                + bm25_contribution
-            ),
-            matched_retrievers=tuple(
-                matched_retrievers
-            ),
+            rrf_score=(dense_contribution + bm25_contribution),
+            matched_retrievers=tuple(matched_retrievers),
             dense_rank=candidate.dense_rank,
             dense_score=candidate.dense_score,
-            dense_rrf_contribution=(
-                dense_contribution
-            ),
+            dense_rrf_contribution=(dense_contribution),
             bm25_rank=candidate.bm25_rank,
             bm25_score=candidate.bm25_score,
-            bm25_rrf_contribution=(
-                bm25_contribution
-            ),
+            bm25_rrf_contribution=(bm25_contribution),
             chunk=candidate.chunk,
         )
 
@@ -821,9 +502,7 @@ class HybridRetriever:
         if rank is None:
             return 0.0
 
-        return weight / (
-            self.config.rrf_k + rank
-        )
+        return weight / (self.config.rrf_k + rank)
 
     def _validate_corpus_alignment(self) -> None:
         """Vérifier que FAISS et BM25 indexent le même corpus."""
@@ -838,15 +517,9 @@ class HybridRetriever:
                 f"{len(dense_chunks)} != {len(bm25_chunks)}."
             )
 
-        dense_ids = [
-            chunk.chunk_id
-            for chunk in dense_chunks
-        ]
+        dense_ids = [chunk.chunk_id for chunk in dense_chunks]
 
-        bm25_ids = [
-            chunk.chunk_id
-            for chunk in bm25_chunks
-        ]
+        bm25_ids = [chunk.chunk_id for chunk in bm25_chunks]
 
         if dense_ids != bm25_ids:
             raise ValueError(
@@ -859,26 +532,15 @@ class HybridRetriever:
             bm25_chunks,
             strict=True,
         ):
-            if (
-                dense_chunk.document_id
-                != bm25_chunk.document_id
-            ):
+            if dense_chunk.document_id != bm25_chunk.document_id:
                 raise ValueError(
-                    f"{dense_chunk.chunk_id} : document_id "
-                    "différent entre les deux index."
+                    f"{dense_chunk.chunk_id} : document_id différent entre les deux index."
                 )
 
-            if (
-                dense_chunk.source_pages
-                != bm25_chunk.source_pages
-            ):
+            if dense_chunk.source_pages != bm25_chunk.source_pages:
                 raise ValueError(
-                    f"{dense_chunk.chunk_id} : pages sources "
-                    "différentes entre les deux index."
+                    f"{dense_chunk.chunk_id} : pages sources différentes entre les deux index."
                 )
 
             if dense_chunk.text != bm25_chunk.text:
-                raise ValueError(
-                    f"{dense_chunk.chunk_id} : texte différent "
-                    "entre les deux index."
-                )
+                raise ValueError(f"{dense_chunk.chunk_id} : texte différent entre les deux index.")

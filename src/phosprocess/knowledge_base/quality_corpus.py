@@ -49,9 +49,7 @@ class QualityCorpusProcessor:
         chunker: TechnicalDocumentChunker | None = None,
     ) -> None:
         self.root = knowledge_base_root.resolve()
-        self.extractor = extractor or DoclingStructuredExtractor(
-            parsed_root=self.root / "parsed"
-        )
+        self.extractor = extractor or DoclingStructuredExtractor(parsed_root=self.root / "parsed")
         self.chunker = chunker or TechnicalDocumentChunker()
 
     def _corpus_directory(self, entry: DocumentCatalogEntry) -> Path:
@@ -72,9 +70,7 @@ class QualityCorpusProcessor:
             raise FileNotFoundError(f"Source absente : {entry.source_filename}")
 
         if source.parent.name != "pdfs":
-            raise ValueError(
-                f"Le document {entry.document_id} n'est pas dans le corpus actif."
-            )
+            raise ValueError(f"Le document {entry.document_id} n'est pas dans le corpus actif.")
 
         extraction = self.extractor.extract(
             pdf_path=source,

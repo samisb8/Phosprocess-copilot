@@ -66,11 +66,7 @@ class WorkingChunk:
     ) -> WorkingChunk:
         """Créer un chunk de travail depuis un chunk validé."""
 
-        source_ids = (
-            chunk.source_chunk_ids
-            if chunk.source_chunk_ids
-            else [chunk.chunk_id]
-        )
+        source_ids = chunk.source_chunk_ids if chunk.source_chunk_ids else [chunk.chunk_id]
 
         return cls(
             document_id=chunk.document_id,
@@ -111,16 +107,11 @@ class ChunkPostprocessor:
     ) -> PostprocessingResult:
         """Exécuter toutes les opérations de post-traitement."""
 
-        working_chunks = [
-            WorkingChunk.from_document_chunk(chunk)
-            for chunk in chunks
-        ]
+        working_chunks = [WorkingChunk.from_document_chunk(chunk) for chunk in chunks]
 
         input_chunk_count = len(working_chunks)
 
-        boilerplate_lines = self._detect_boilerplate_lines(
-            working_chunks
-        )
+        boilerplate_lines = self._detect_boilerplate_lines(working_chunks)
 
         removed_line_count = 0
 
@@ -134,19 +125,15 @@ class ChunkPostprocessor:
         duplicates_removed = 0
 
         if self.config.deduplicate_exact:
-            working_chunks, duplicates_removed = (
-                self._deduplicate_exact(working_chunks)
-            )
+            working_chunks, duplicates_removed = self._deduplicate_exact(working_chunks)
 
         restored_pages: list[int] = []
         fallback_chunks_added = 0
 
         if self.config.restore_uncovered_pages:
-            fallback_chunks, restored_pages = (
-                self._create_missing_page_chunks(
-                    chunks=working_chunks,
-                    pages=pages,
-                )
+            fallback_chunks, restored_pages = self._create_missing_page_chunks(
+                chunks=working_chunks,
+                pages=pages,
             )
 
             fallback_chunks_added = len(fallback_chunks)
@@ -155,9 +142,7 @@ class ChunkPostprocessor:
         merged_chunks = 0
 
         if self.config.merge_small_chunks:
-            working_chunks, merged_chunks = (
-                self._merge_small_chunks(working_chunks)
-            )
+            working_chunks, merged_chunks = self._merge_small_chunks(working_chunks)
 
         working_chunks.sort(
             key=lambda chunk: (
@@ -176,15 +161,11 @@ class ChunkPostprocessor:
         ]
 
         covered_pages = {
-            page_number
-            for chunk in final_chunks
-            for page_number in chunk.source_pages
+            page_number for chunk in final_chunks for page_number in chunk.source_pages
         }
 
         expected_pages = {
-            page.provenance.page_number
-            for page in pages
-            if not page.quality.is_empty
+            page.provenance.page_number for page in pages if not page.quality.is_empty
         }
 
         uncovered_pages = sorted(expected_pages - covered_pages)
@@ -232,9 +213,7 @@ class ChunkPostprocessor:
                 if not normalized:
                     continue
 
-                if len(stripped) > (
-                    self.config.boilerplate_max_line_characters
-                ):
+                if len(stripped) > (self.config.boilerplate_max_line_characters):
                     continue
 
                 if self._is_protected_line(stripped):
@@ -247,10 +226,7 @@ class ChunkPostprocessor:
 
         threshold = max(
             self.config.boilerplate_min_occurrences,
-            math.ceil(
-                len(chunks)
-                * self.config.boilerplate_min_fraction
-            ),
+            math.ceil(len(chunks) * self.config.boilerplate_min_fraction),
         )
 
         boilerplate: set[str] = set()
@@ -259,15 +235,9 @@ class ChunkPostprocessor:
             original = original_lines[normalized]
             word_count = len(original.split())
 
-            repeated_short_line = (
-                count >= threshold
-                and word_count <= 10
-            )
+            repeated_short_line = count >= threshold and word_count <= 10
 
-            hinted_line = (
-                count >= 2
-                and bool(_BOILERPLATE_HINT.search(original))
-            )
+            hinted_line = count >= 2 and bool(_BOILERPLATE_HINT.search(original))
 
             if repeated_short_line or hinted_line:
                 boilerplate.add(normalized)
@@ -287,10 +257,7 @@ class ChunkPostprocessor:
         for line in chunk.text.splitlines():
             normalized = self._normalize_text(line)
 
-            if (
-                normalized in boilerplate_lines
-                and not self._is_protected_line(line)
-            ):
+            if normalized in boilerplate_lines and not self._is_protected_line(line):
                 removed_count += 1
                 continue
 
@@ -364,11 +331,7 @@ class ChunkPostprocessor:
     ) -> tuple[list[WorkingChunk], list[int]]:
         """Créer des chunks de secours pour les pages oubliées."""
 
-        covered_pages = {
-            page_number
-            for chunk in chunks
-            for page_number in chunk.source_pages
-        }
+        covered_pages = {page_number for chunk in chunks for page_number in chunk.source_pages}
 
         fallback_chunks: list[WorkingChunk] = []
         restored_pages: list[int] = []
@@ -475,16 +438,11 @@ class ChunkPostprocessor:
         while index < len(chunks):
             current = chunks[index]
 
-            if (
-                self._working_token_count(current)
-                >= self.config.min_chunk_tokens
-            ):
+            if self._working_token_count(current) >= self.config.min_chunk_tokens:
                 index += 1
                 continue
 
-            candidates: list[
-                tuple[tuple[int, int], int, WorkingChunk]
-            ] = []
+            candidates: list[tuple[tuple[int, int], int, WorkingChunk]] = []
 
             for candidate_index in (index - 1, index + 1):
                 if not 0 <= candidate_index < len(chunks):
@@ -501,16 +459,11 @@ class ChunkPostprocessor:
                 if merged_tokens > self.config.max_tokens:
                     continue
 
-                same_heading = int(
-                    current.heading_path
-                    == candidate.heading_path
-                )
+                same_heading = int(current.heading_path == candidate.heading_path)
 
                 score = (same_heading, merged_tokens)
 
-                candidates.append(
-                    (score, candidate_index, merged)
-                )
+                candidates.append((score, candidate_index, merged))
 
             if not candidates:
                 index += 1
@@ -560,11 +513,7 @@ class ChunkPostprocessor:
         )
 
         if not heading_path:
-            heading_path = (
-                left.heading_path
-                if left.heading_path
-                else right.heading_path
-            )
+            heading_path = left.heading_path if left.heading_path else right.heading_path
 
         return WorkingChunk(
             document_id=left.document_id,
@@ -611,17 +560,12 @@ class ChunkPostprocessor:
 
         embedding_text = self._build_embedding_text(chunk)
 
-        digest_input = (
-            f"{chunk.document_id}|{chunk_index}|"
-            f"{source_pages}|{text}"
-        ).encode()
+        digest_input = (f"{chunk.document_id}|{chunk_index}|{source_pages}|{text}").encode()
 
         digest = hashlib.sha256(digest_input).hexdigest()[:12]
 
         return DocumentChunk(
-            chunk_id=(
-                f"{chunk.document_id}_{chunk_index:06d}_{digest}"
-            ),
+            chunk_id=(f"{chunk.document_id}_{chunk_index:06d}_{digest}"),
             document_id=chunk.document_id,
             source_file=chunk.source_file,
             chunk_index=chunk_index,
@@ -633,15 +577,9 @@ class ChunkPostprocessor:
             text=text,
             embedding_text=embedding_text,
             body_token_count=self.token_counter.count_tokens(text),
-            token_count=self.token_counter.count_tokens(
-                embedding_text
-            ),
-            source_chunk_ids=self._unique_list(
-                chunk.source_chunk_ids
-            ),
-            postprocessing_actions=self._unique_list(
-                chunk.actions
-            ),
+            token_count=self.token_counter.count_tokens(embedding_text),
+            source_chunk_ids=self._unique_list(chunk.source_chunk_ids),
+            postprocessing_actions=self._unique_list(chunk.actions),
         )
 
     def _build_embedding_text(
@@ -658,9 +596,7 @@ class ChunkPostprocessor:
         ]
 
         if chunk.heading_path:
-            context.append(
-                f"Section: {' > '.join(chunk.heading_path)}"
-            )
+            context.append(f"Section: {' > '.join(chunk.heading_path)}")
 
         return "\n".join(context) + "\n\n" + chunk.text.strip()
 
@@ -670,9 +606,7 @@ class ChunkPostprocessor:
     ) -> int:
         """Compter les tokens d'un chunk de travail."""
 
-        return self.token_counter.count_tokens(
-            self._build_embedding_text(chunk)
-        )
+        return self.token_counter.count_tokens(self._build_embedding_text(chunk))
 
     @staticmethod
     def _merge_texts(left: str, right: str) -> str:
@@ -688,9 +622,7 @@ class ChunkPostprocessor:
                 if not paragraph:
                     continue
 
-                signature = ChunkPostprocessor._normalize_text(
-                    paragraph
-                )
+                signature = ChunkPostprocessor._normalize_text(paragraph)
 
                 if signature in signatures:
                     continue
@@ -733,20 +665,12 @@ class ChunkPostprocessor:
                 previous = page
                 continue
 
-            ranges.append(
-                str(start)
-                if start == previous
-                else f"{start}-{previous}"
-            )
+            ranges.append(str(start) if start == previous else f"{start}-{previous}")
 
             start = page
             previous = page
 
-        ranges.append(
-            str(start)
-            if start == previous
-            else f"{start}-{previous}"
-        )
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
 
         return ", ".join(ranges)
 
@@ -765,10 +689,7 @@ class ChunkPostprocessor:
 
         stripped = line.strip()
 
-        return (
-            stripped.startswith("|")
-            or bool(_PROTECTED_TECHNICAL_LINE.search(stripped))
-        )
+        return stripped.startswith("|") or bool(_PROTECTED_TECHNICAL_LINE.search(stripped))
 
     @staticmethod
     def _unique_list(items: list[str]) -> list[str]:

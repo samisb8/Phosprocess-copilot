@@ -38,13 +38,9 @@ def test_pipeline_methods_live_in_expected_modules() -> None:
     )
 
 
-def test_fidelity_facade_keeps_public_contract_imports() -> None:
-    from phosprocess.rag.fidelity import (
-        enforce_answer_contract,
-        prune_unsupported_claims,
-        validate_claim_support,
-    )
+def test_objective_validation_and_claim_parsing_have_direct_owners() -> None:
+    from phosprocess.rag.citation_binding import iter_answer_claims
+    from phosprocess.rag.claim_support import validate_claim_support
 
-    assert enforce_answer_contract.__module__ == "phosprocess.rag.answer_contracts"
-    assert prune_unsupported_claims.__module__ == "phosprocess.rag.citation_binding"
+    assert iter_answer_claims.__module__ == "phosprocess.rag.citation_binding"
     assert validate_claim_support.__module__ == "phosprocess.rag.claim_support"

@@ -24,9 +24,7 @@ class OllamaCallMetrics:
     call_type: str
     model: str
     streaming: bool
-    started_at_utc: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    started_at_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     prompt_character_count: int = 0
     estimated_prompt_tokens: int = 0
     connection_ms: float = 0.0
@@ -76,6 +74,7 @@ class RAGLatencyMetrics:
     question_validation_ms: float = 0.0
     followup_detection_ms: float = 0.0
     reformulation_ms: float = 0.0
+    resolver_llm_ms: float = 0.0
     embedding_ms: float = 0.0
     dense_search_ms: float = 0.0
     bm25_search_ms: float = 0.0
@@ -102,6 +101,7 @@ class RAGLatencyMetrics:
     total_ms: float = 0.0
 
     ollama_call_count: int = 0
+    resolver_llm_call_count: int = 0
     prompt_character_count: int = 0
     estimated_prompt_tokens: int = 0
     generated_character_count: int = 0
@@ -117,6 +117,7 @@ class RAGLatencyMetrics:
     baseline_equivalent_prompt_tokens: int = 0
     repair_attempted: bool = False
     repair_reason: str | None = None
+    truncation_salvaged: bool = False
     reformulation_attempted: bool = False
     reformulation_method: str = "none"
     retrieval_query: str = ""
@@ -137,16 +138,10 @@ class RAGLatencyMetrics:
         self.ollama_call_count += 1
         self.ollama_calls.append(call.to_dict())
         self.ollama_connection_ms += call.connection_ms
-        self.ollama_time_to_first_event_ms = (
-            call.time_to_first_event_ms
-        )
-        self.ollama_time_to_first_token_ms = (
-            call.time_to_first_token_ms
-        )
+        self.ollama_time_to_first_event_ms = call.time_to_first_event_ms
+        self.ollama_time_to_first_token_ms = call.time_to_first_token_ms
         self.ollama_generation_ms += call.generation_ms
-        self.generated_character_count = (
-            call.generated_character_count
-        )
+        self.generated_character_count = call.generated_character_count
         self.generated_chunk_count = call.generated_chunk_count
         self.generated_token_count = call.generated_token_count
 
@@ -158,11 +153,7 @@ class RAGLatencyMetrics:
     def concise_log_fields(self) -> str:
         """Build a one-line diagnostic without prompts or document text."""
 
-        retrieval_ms = (
-            self.dense_search_ms
-            + self.bm25_search_ms
-            + self.hybrid_fusion_ms
-        )
+        retrieval_ms = self.dense_search_ms + self.bm25_search_ms + self.hybrid_fusion_ms
         return (
             f"question_id={self.question_id} "
             f"retrieval_ms={retrieval_ms:.1f} "

@@ -40,41 +40,25 @@ def _validate_sections(
         for chunk_id in section.child_chunk_ids:
             child = child_by_id.get(chunk_id)
             if child is None:
-                raise ValueError(
-                    f"Chunk absent de la section {section.section_id}: {chunk_id}."
-                )
+                raise ValueError(f"Chunk absent de la section {section.section_id}: {chunk_id}.")
             if child.section_id != section.section_id:
-                raise ValueError(
-                    f"section_id incohérent pour {child.chunk_id}."
-                )
+                raise ValueError(f"section_id incohérent pour {child.chunk_id}.")
             if child.document_id != section.document_id:
-                raise ValueError(
-                    f"Document incohérent pour la section {section.section_id}."
-                )
+                raise ValueError(f"Document incohérent pour la section {section.section_id}.")
             if child.hierarchy_path != section.hierarchy_path:
-                raise ValueError(
-                    f"Chemin hiérarchique incohérent pour {child.chunk_id}."
-                )
+                raise ValueError(f"Chemin hiérarchique incohérent pour {child.chunk_id}.")
             section_children.append(child)
             assigned_children.add(chunk_id)
 
         expected_types = {child.chunk_type for child in section_children}
         if set(section.chunk_types) != expected_types:
-            raise ValueError(
-                f"Types de chunks incohérents pour {section.section_id}."
-            )
+            raise ValueError(f"Types de chunks incohérents pour {section.section_id}.")
         if section.page_start != min(child.page_start for child in section_children):
-            raise ValueError(
-                f"page_start incohérente pour {section.section_id}."
-            )
+            raise ValueError(f"page_start incohérente pour {section.section_id}.")
         if section.page_end != max(child.page_end for child in section_children):
-            raise ValueError(
-                f"page_end incohérente pour {section.section_id}."
-            )
+            raise ValueError(f"page_end incohérente pour {section.section_id}.")
         if not section.embedding_text.strip() or not section.bm25_text.strip():
-            raise ValueError(
-                f"Représentation de section vide : {section.section_id}."
-            )
+            raise ValueError(f"Représentation de section vide : {section.section_id}.")
 
     if assigned_children != set(child_by_id):
         raise ValueError("Chaque chunk doit appartenir exactement à une section.")

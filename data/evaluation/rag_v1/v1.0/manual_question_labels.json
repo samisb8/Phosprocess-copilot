@@ -1,0 +1,795 @@
+{
+  "CE051": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "D",
+      "K"
+    ],
+    "rationale": "Scaling effects requested (heat-transfer coefficient/pressure drop) are absent; unrelated HF corrosion is presented as the effect of scaling."
+  },
+  "CE052": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Perry difficulties were directly recovered and covered."
+  },
+  "CE054": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Latent heat is correctly identified as the enthalpy change of vaporization/phase change, with no material unsupported addition."
+  },
+  "CE055": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The answer correctly uses Reynolds number to distinguish laminar and turbulent pipe flow; the transition wording is simplified but adequate for the question."
+  },
+  "CE056": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Critical supersaturation and onset of nucleation are correctly linked."
+  },
+  "CE057": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Persistent error plus actuator saturation/reset windup mechanism is correctly explained."
+  },
+  "CE060": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The documentary evaporative-capacity relation is reproduced."
+  },
+  "CE061": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "D",
+      "F"
+    ],
+    "rationale": "Core variables are present, but several units and final P2O5 equations are transformed incorrectly."
+  },
+  "CE062": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "No-slip boundary condition is correctly stated."
+  },
+  "CE065": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Definition and operating factors are grounded."
+  },
+  "CE066": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "F",
+      "K"
+    ],
+    "rationale": "The answer gives Becker's 27→54% example instead of the required 29→54% plant value and does not establish the requested vacuum-evaporation route."
+  },
+  "DQ001": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Forced-circulation evaporator definition and heating loop are covered."
+  },
+  "DQ003": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "K"
+    ],
+    "rationale": "The retrieved chemistry/slurry-recirculation material does not answer why forced-evaporator recirculation is needed for heat transfer."
+  },
+  "DQ004": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Preparation, attack, filtration and concentration are covered by a valid documentary route."
+  },
+  "DQ005": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C"
+    ],
+    "rationale": "The answer covers concentration as an operating KPI but does not fully explain the concentration/boiling-point/evaporator-operation relationship."
+  },
+  "DQ006": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Filtration and calcium-sulfate separation are directly answered."
+  },
+  "DQ007": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "The response recognizes a crystal-size/filtration relationship but reverses the main physical direction and cites weak evidence for the claimed mechanism."
+  },
+  "DQ008": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Reaction, dilution, agitation and temperature are covered."
+  },
+  "DQ009": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "F"
+    ],
+    "rationale": "Several DH/HH comparison points are documented, but the answer incorrectly states lower HH efficiency/higher sulfur consumption while the cited passage says sulfuric-acid consumption can be lower at equal efficiency."
+  },
+  "DQ010": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Documentary P2O5 loss mechanisms and values are reproduced."
+  },
+  "DQ011": {
+    "evidence_available": "YES",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "E"
+    ],
+    "rationale": "The thermodynamic relation stated is broadly correct, but the cited boiling-curve passage does not substantiate the claimed pressure/boiling-temperature explanation."
+  },
+  "DQ012": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "E"
+    ],
+    "rationale": "The practical low-pressure/evaporation conclusion is supported, but the wording that lowering pressure decreases saturation vapor pressure is thermodynamically imprecise and one citation is indirect."
+  },
+  "DQ014": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Boiler/reboiler distinction is grounded."
+  },
+  "DQ016": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Latent heat and phase change are correctly explained."
+  },
+  "DQ017": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "E",
+      "F"
+    ],
+    "rationale": "The Antoine relationship and variables answer the question, but the specific units attached to P and T are not established by the cited excerpt and depend on the coefficient convention."
+  },
+  "DQ018": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The exchanger heat-transfer role is well documented."
+  },
+  "DQ019": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "D",
+      "F"
+    ],
+    "rationale": "The energy-balance structure is present, but several units/terms and rearranged equations are not consistently preserved or locally supported."
+  },
+  "DQ020": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Heat-exchanger role is concise and grounded."
+  },
+  "DQ021": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "G"
+    ],
+    "rationale": "The core fouling mechanism is grounded and complete, but max-token truncation produced extensive repetition/ancillary material before the controlled insufficiency suffix."
+  },
+  "DQ023": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "E"
+    ],
+    "rationale": "Conduction/convection distinction is essentially correct, with some generic/uncited explanatory wording and imperfect citation locality."
+  },
+  "DQ024": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Fouling signs are comprehensively grounded."
+  },
+  "DQ029": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "The viscosity–friction-factor relationship is useful, but the response overgeneralizes proportionality between viscosity and pressure drop beyond the regime supported."
+  },
+  "DQ030": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Diffusion and convection are correctly distinguished."
+  },
+  "DQ033": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Gypsum crystal-size operating factors are grounded."
+  },
+  "DQ034": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Primary and secondary nucleation are correctly distinguished."
+  },
+  "DQ035": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Crystal-growth parameters are complete, though verbose."
+  },
+  "DQ038": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "The answer includes the correct evaporator manipulated variables, but first introduces distillation variables that are not the requested evaporator control set."
+  },
+  "DQ039": {
+    "evidence_available": "NO",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "B",
+      "A",
+      "D",
+      "K"
+    ],
+    "rationale": "Generic MPC design material is available, but there is no single grounded evaporator-specific MPC application; the answer extrapolates a complete procedure."
+  },
+  "DQ040": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "PID/MPC comparison is correct; one uncited interaction statement is broader than the bundles."
+  },
+  "DQ041": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Closed-loop stability consequences and criteria are covered."
+  },
+  "DQ043": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "D"
+    ],
+    "rationale": "The response identifies useful measured/manipulated variables but mislabels feed composition/flow as controlled variables; evidence use is partial."
+  },
+  "DQ044": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "K"
+    ],
+    "rationale": "Without conversation history the fragment is unresolved and the answer drifts to distillation/general MV selection instead of the evaporator variables."
+  },
+  "DQ045": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "B"
+    ],
+    "rationale": "Equivalent OCP bundles provide a complete equipment list despite packing out the exact frozen route."
+  },
+  "DQ048": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "D",
+      "K"
+    ],
+    "rationale": "The Arabic question is routed to refrigeration-evaporator material rather than the phosphoric-acid evaporator heat exchanger."
+  },
+  "DQ049": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Arabic fouling explanation is grounded and complete."
+  },
+  "ABS_DQ050": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": "I",
+    "failure_codes": [
+      "I"
+    ],
+    "rationale": "Correct French refusal for an undocumented helmet color."
+  },
+  "ABS_CE058": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": "I",
+    "failure_codes": [
+      "I"
+    ],
+    "rationale": "Correct English refusal for live telemetry absent from the corpus."
+  },
+  "ABS_CE059": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": "I",
+    "failure_codes": [
+      "I"
+    ],
+    "rationale": "Correct Arabic refusal for current staffing absent from the corpus."
+  },
+  "PROCESS_FLOW_ACCEPTANCE": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "G"
+    ],
+    "rationale": "The retrieved OCP steps are individually grounded, but the answer concatenates two operating descriptions, backtracks after product storage, and mixes roughly 75 mmHg with 60 Torr."
+  },
+  "CONV02_T2_DQ021": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "English follow-up resolution and fouling mechanism are correct; ancillary redesign/flow-rate consequences go beyond the minimum answer."
+  },
+  "CONV04_T2_DQ044": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "H"
+    ],
+    "rationale": "The follow-up resolves to the correct evaporator manipulated variables and evidence; the deterministic language detector flags the English variable labels despite a French lead-in."
+  },
+  "CONV06_T2_DQ049": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The Arabic answer is grounded in heat-exchanger fouling evidence; resolver referent expansion remains a known best-effort limitation outside the FR/EN V1 gate."
+  },
+  "CE053": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The Kern-Seaton description is directly recovered from the OCP report and answered completely."
+  },
+  "CE063": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The frozen thermodynamics evidence explicitly identifies temperature, pressure, and fugacity as the pure-species VLE equilibrium conditions."
+  },
+  "CE064": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The Becker evidence directly supports the P2O5 recovery, concentration/energy, and filtration benefits requested."
+  },
+  "CE067": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Seborg directly supports the level and pressure safety/operability reasons, including entrainment, steam-chest exposure, and boiling-regime upset."
+  },
+  "DQ002": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "K"
+    ],
+    "rationale": "The retrieved context does not contain the required forced-circulation pump/heating route; the answer instead narrates phosphoric-acid manufacture and generic concentration rather than the trajectory inside the equipment."
+  },
+  "DQ013": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "D",
+      "E"
+    ],
+    "rationale": "The OCP context contains practical vapor/liquid separation and saturation information and the answer explains vacuum concentration, but it omits a clear equilibrium criterion and includes some imprecise or weakly cited operational wording."
+  },
+  "DQ015": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "D",
+      "E"
+    ],
+    "rationale": "The enthalpy/heat relationship and tabulated liquid-vapor enthalpies are relevant, but the answer generalizes a closed-system constant-pressure identity to a stationary evaporation balance and omits the steady-flow balance structure."
+  },
+  "DQ022": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Perry provides the heat-exchanger design equation and the role of U, and the response uses it correctly for sizing."
+  },
+  "DQ025": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The OCP report directly supports circulation flow, the pump role in the concentration loop, adjustable flow, and its electrical-energy burden."
+  },
+  "DQ026": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "E"
+    ],
+    "rationale": "Perry contains sufficient pressure-drop/flow relationships to answer the question correctly; one recirculation statement is only indirectly supported by its cited bundle."
+  },
+  "DQ027": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "E",
+      "K"
+    ],
+    "rationale": "The required Bird pipe momentum-balance route is absent from the final context. The response gives a broadly correct generic description but relies on droplet-force and energy-balance passages instead of a grounded pipe momentum balance."
+  },
+  "DQ028": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "E",
+      "G"
+    ],
+    "rationale": "The context exposes laminar, turbulent, and Reynolds concepts, but the answer expands them into a very long list of non-regime attributes that is not supported by Perry."
+  },
+  "DQ031": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The Perry passages directly support the definition of supersaturation and its link to nucleation and crystal growth."
+  },
+  "DQ032": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "Mullin directly supports the influence of supersaturation on critical nucleus formation, nucleation rate, and the induction period."
+  },
+  "DQ036": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "The solubility/supersolubility diagram and metastable-zone behavior are recovered correctly, apart from describing the metastable zone itself as 'unstable', which Mullin distinguishes from the labile/unstable zone."
+  },
+  "DQ037": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "D"
+    ],
+    "rationale": "Becker directly links residence time to crystal growth and CSD, but the answer incorrectly states that shorter growth time can increase crystal size and then partially contradicts itself."
+  },
+  "DQ042": {
+    "evidence_available": "NO",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "A",
+      "K"
+    ],
+    "rationale": "As a standalone primary fragment, the referent is unresolved and retrieval drifts to OCP circulation-flow sensitivity rather than the intended control-disturbance relationship."
+  },
+  "DQ046": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [],
+    "rationale": "The OCP acid-circuit passage directly supports the exchanger-to-boiler-to-54%-storage route and the accompanying vapor path."
+  },
+  "DQ047": {
+    "evidence_available": "YES",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C"
+    ],
+    "rationale": "The correct acid route after the exchanger is present in the context, but the generator selects the steam-circuit sentence and answers where the vapor goes instead of where the acid goes."
+  },
+  "CONV01_T2_DQ002": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "G"
+    ],
+    "rationale": "The resolver correctly identifies a forced-circulation evaporator and the context contains the pump/heating/flash-chamber route, but the answer begins upstream at clarification and never gives the requested forced-circulation loop."
+  },
+  "CONV01_T3_DQ003": {
+    "evidence_available": "YES",
+    "evidence_used": "YES",
+    "completeness": "MOSTLY_COMPLETE",
+    "answer_success": true,
+    "refusal_class": null,
+    "failure_codes": [
+      "D",
+      "E"
+    ],
+    "rationale": "The Perry forced-circulation evidence supports mixing, local heating/boiling and critical recirculation parameters, but the answer adds an unsupported heat-loss/corrosion-avoidance rationale."
+  },
+  "CONV03_T2_DQ042": {
+    "evidence_available": "YES",
+    "evidence_used": "PARTIAL",
+    "completeness": "PARTIAL",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C",
+      "E"
+    ],
+    "rationale": "Seborg contains flow-disturbance and closed-loop stability material, but the resolved question asks how stability affects disturbances while the answer mainly explains the reverse causal direction and cites only generic flow-loop text."
+  },
+  "CONV05_T2_DQ047": {
+    "evidence_available": "YES",
+    "evidence_used": "NO",
+    "completeness": "MISSED",
+    "answer_success": false,
+    "refusal_class": null,
+    "failure_codes": [
+      "C"
+    ],
+    "rationale": "The resolver correctly makes the acid referent explicit and the correct exchanger-to-boiler evidence is present, but generation answers with the steam-condensate path instead."
+  }
+}

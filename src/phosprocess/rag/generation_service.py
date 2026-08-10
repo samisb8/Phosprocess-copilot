@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 
 from phosprocess.llm.ollama_client import (
     OllamaError,
@@ -14,13 +14,10 @@ from phosprocess.llm.ollama_client import (
 from phosprocess.observability.latency import OllamaCallMetrics, RAGLatencyMetrics
 from phosprocess.rag.adaptive_router import AdaptiveRouteDecision, RequestPath
 from phosprocess.rag.citations import CitationValidationError
-from phosprocess.rag.fidelity import enforce_answer_contract, prune_unsupported_claims
 from phosprocess.rag.language import detect_response_language
 from phosprocess.rag.prompts import (
-    REPAIR_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_direct_prompt_package,
-    build_repair_prompt,
 )
 from phosprocess.rag.retrieval_service import (
     RAGGenerationError,
@@ -32,7 +29,6 @@ from phosprocess.rag.schemas import (
     RAGStreamEvent,
     RAGTimings,
 )
-from phosprocess.retrieval.evidence_bundle import EvidenceBundle
 
 LOGGER = logging.getLogger("phosprocess.rag.pipeline")
 
@@ -45,13 +41,8 @@ def _controlled_fallback_for_language(language: str) -> str:
             "answer this question precisely."
         )
     if normalized.startswith("ar"):
-        return (
-            "لا توفر المقاطع المسترجعة معلومات كافية للإجابة عن هذا السؤال بدقة."
-        )
-    return (
-        "Les passages retrouvés ne permettent pas de répondre précisément "
-        "à cette question."
-    )
+        return "لا توفر المقاطع المسترجعة معلومات كافية للإجابة عن هذا السؤال بدقة."
+    return "Les passages retrouvés ne permettent pas de répondre précisément à cette question."
 
 
 class GenerationService:
@@ -113,9 +104,7 @@ class GenerationService:
             response_language=response_language,
             standalone_query=question,
             question_type=(
-                decision.direct_intent.value
-                if decision.direct_intent is not None
-                else "direct"
+                decision.direct_intent.value if decision.direct_intent is not None else "direct"
             ),
             detected_domains=[],
             timings=RAGTimings(
@@ -159,13 +148,9 @@ class GenerationService:
         except OllamaError as error:
             raise RAGGenerationError(str(error)) from error
         except Exception as error:
-            raise RAGGenerationError(
-                "La génération directe locale Qwen a échoué."
-            ) from error
+            raise RAGGenerationError("La génération directe locale Qwen a échoué.") from error
 
-        generation_ms = (
-            time.perf_counter() - generation_started
-        ) * 1000.0
+        generation_ms = (time.perf_counter() - generation_started) * 1000.0
         total_ms = (time.perf_counter() - started) * 1000.0
         return self._build_direct_response(
             question=question,
@@ -200,9 +185,7 @@ class GenerationService:
         metrics.source_policy_primary = "Aucune"
         metrics.source_policy_attempt_count = 0
         direct_type = (
-            decision.direct_intent.value
-            if decision.direct_intent is not None
-            else "direct"
+            decision.direct_intent.value if decision.direct_intent is not None else "direct"
         )
 
         yield RAGStreamEvent(
@@ -246,9 +229,7 @@ class GenerationService:
             decision,
             json_output=False,
         )
-        metrics.prompt_build_ms = (
-            time.perf_counter() - prompt_started
-        ) * 1000.0
+        metrics.prompt_build_ms = (time.perf_counter() - prompt_started) * 1000.0
         metrics.prompt_character_count = package.size.total_characters
         metrics.estimated_prompt_tokens = package.size.total_tokens
         metrics.system_prompt_token_count = package.size.system_tokens
@@ -273,12 +254,8 @@ class GenerationService:
                 telemetry=call,
             ):
                 if first_turn_token_ms is None and fragment.strip():
-                    first_turn_token_ms = (
-                        time.perf_counter() - turn_started
-                    ) * 1000.0
-                    metrics.turn_time_to_first_token_ms = (
-                        first_turn_token_ms
-                    )
+                    first_turn_token_ms = (time.perf_counter() - turn_started) * 1000.0
+                    metrics.turn_time_to_first_token_ms = first_turn_token_ms
                 fragments.append(fragment)
                 yield RAGStreamEvent(
                     event_type="token",
@@ -293,9 +270,7 @@ class GenerationService:
 
         answer = "".join(fragments).strip()
         if not answer:
-            raise RAGGenerationError(
-                "Qwen a retourné une réponse directe vide."
-            )
+            raise RAGGenerationError("Qwen a retourné une réponse directe vide.")
 
         yield RAGStreamEvent(
             event_type="validation_started",
@@ -304,12 +279,8 @@ class GenerationService:
                 "citation_validation_skipped": True,
             },
         )
-        generation_ms = (
-            time.perf_counter() - generation_started
-        ) * 1000.0
-        metrics.total_ms = (
-            time.perf_counter() - turn_started
-        ) * 1000.0
+        generation_ms = (time.perf_counter() - generation_started) * 1000.0
+        metrics.total_ms = (time.perf_counter() - turn_started) * 1000.0
         response = self._build_direct_response(
             question=question,
             answer=answer,
@@ -347,21 +318,52 @@ class GenerationService:
 
         if (
             generated_token_count is None
-            or generated_token_count
-            < self.runtime_config.ollama.max_output_tokens
+            or generated_token_count < self.runtime_config.ollama.max_output_tokens
         ):
             return
 
         if re.search(
-            r"(?:[.!?…]|(?:\[Source [1-5]\]))\s*$",
+            r"(?:[.!?…]|(?:\[Source [1-9]\d*\]))\s*$",
             answer,
         ):
             return
 
         raise CitationValidationError(
-            "La sortie a atteint la limite de tokens au milieu "
-            "d'une phrase."
+            "La sortie a atteint la limite de tokens au milieu d'une phrase."
         )
+
+    def _finalize_likely_truncation(
+        self,
+        answer: str,
+        *,
+        generated_token_count: int | None,
+        response_language: str,
+    ) -> tuple[str, bool]:
+        """Keep a completed cited prefix when generation stops mid-sentence.
+
+        This is an objective, single-call fallback: it never invents text, asks the
+        model again, or treats conversation history as evidence. If no completed
+        citation boundary exists, the original fail-closed behavior is preserved.
+        """
+
+        try:
+            self._reject_likely_truncation(
+                answer,
+                generated_token_count=generated_token_count,
+            )
+        except CitationValidationError:
+            citation_matches = list(
+                re.finditer(r"\[Source [1-9]\d*\]", answer)
+            )
+            if not citation_matches:
+                raise
+            completed_prefix = answer[: citation_matches[-1].end()].rstrip()
+            fallback = _controlled_fallback_for_language(response_language)
+            LOGGER.warning(
+                "Truncated generation reduced to last cited boundary; no retry performed"
+            )
+            return f"{completed_prefix}\n\n{fallback}", True
+        return answer, False
 
     def _generate_json_answer(
         self,
@@ -369,214 +371,30 @@ class GenerationService:
         user_prompt: str,
         available_source_count: int,
         system_prompt: str = SYSTEM_PROMPT,
-        repair_system_prompt: str = REPAIR_SYSTEM_PROMPT,
-        evidence_bundles: Sequence[EvidenceBundle] | None = None,
-        question_type: str | None = None,
-        response_language: str | None = None,
-        comparison_subjects: tuple[str, ...] = (),
-        contract_question: str = "",
-        balance_kind: str | None = None,
     ) -> tuple[GroundedAnswerPayload, list[int], bool]:
-        """Generate answer-only JSON, with at most one repair."""
+        """Generate once, then enforce only JSON and citation invariants."""
 
-        prompt = user_prompt
-        active_system_prompt = system_prompt
-
-        def apply_contract(
-            payload: GroundedAnswerPayload,
-            citations: list[int],
-            insufficient: bool,
-        ) -> tuple[GroundedAnswerPayload, list[int], bool]:
-            if evidence_bundles is None:
-                return payload, citations, insufficient
-
-            contract_language = response_language or (
-                "en"
-                if re.search(
-                    r"\b(?:the|is|are|does|cannot|corpus)\b",
-                    payload.answer.casefold(),
-                )
-                else "fr"
+        try:
+            payload, _raw_output = self.llm.chat_json_with_raw(
+                user_prompt=user_prompt,
+                system_prompt=system_prompt,
+                response_model=GroundedAnswerPayload,
             )
-            contract = enforce_answer_contract(
-                payload.answer,
-                list(evidence_bundles),
-                question_type=question_type,
-                language=contract_language,
-                comparison_subjects=comparison_subjects,
-                question=contract_question,
-                balance_kind=balance_kind,
+        except OllamaResponseValidationError as error:
+            raise RAGResponseValidationError(
+                f"Réponse Qwen JSON invalide : {error}"
+            ) from error
+        except OllamaError as error:
+            raise RAGGenerationError(str(error)) from error
+        except Exception as error:
+            raise RAGGenerationError("La génération locale Qwen a échoué.") from error
+
+        try:
+            citations, insufficient = self._validate_answer(
+                answer=payload.answer,
+                available_source_count=available_source_count,
+                attempt="initial",
             )
-            LOGGER.info(
-                "RAG answer contract type=%s changed=%s fallback=%s "
-                "missing_roles=%s removed_claims=%d atomic_plan=%s",
-                question_type,
-                contract.changed,
-                contract.fallback_used,
-                contract.missing_roles,
-                len(contract.removed_claims),
-                contract.atomic_plan_used,
-            )
-            normalized_payload = payload.model_copy(
-                update={"answer": contract.answer}
-            )
-            if contract.fallback_used:
-                return normalized_payload, [], True
-            if contract.changed or insufficient:
-                try:
-                    normalized_citations, normalized_insufficient = (
-                        self._validate_answer(
-                            answer=contract.answer,
-                            available_source_count=available_source_count,
-                            attempt="answer_contract",
-                            evidence_bundles=evidence_bundles,
-                        )
-                    )
-                except CitationValidationError as contract_error:
-                    LOGGER.warning(
-                        "RAG deterministic answer builder fallback reason=%s",
-                        contract_error,
-                    )
-                    fallback = _controlled_fallback_for_language(
-                        contract_language
-                    )
-                    return (
-                        normalized_payload.model_copy(
-                            update={"answer": fallback}
-                        ),
-                        [],
-                        True,
-                    )
-                return (
-                    normalized_payload,
-                    normalized_citations,
-                    normalized_insufficient,
-                )
-            return normalized_payload, citations, insufficient
-
-        for attempt_index, attempt in enumerate(("initial", "repair")):
-            raw_output = ""
-
-            try:
-                payload, raw_output = self.llm.chat_json_with_raw(
-                    user_prompt=prompt,
-                    system_prompt=active_system_prompt,
-                    response_model=GroundedAnswerPayload,
-                )
-            except OllamaResponseValidationError as error:
-                raw_output = error.raw_response or ""
-                rejection: Exception = error
-            except OllamaError as error:
-                raise RAGGenerationError(str(error)) from error
-            except Exception as error:
-                raise RAGGenerationError(
-                    "La génération locale Qwen a échoué."
-                ) from error
-            else:
-                try:
-                    citations, insufficient = self._validate_answer(
-                        answer=payload.answer,
-                        available_source_count=available_source_count,
-                        attempt=attempt,
-                        evidence_bundles=evidence_bundles,
-                    )
-                except CitationValidationError as error:
-                    if evidence_bundles is None:
-                        rejection = error
-                    else:
-                        fallback_language = (
-                            "en"
-                            if re.search(
-                                r"\b(?:the|is|are|does|cannot|corpus)\b",
-                                payload.answer.casefold(),
-                            )
-                            else "fr"
-                        )
-                        pruned = prune_unsupported_claims(
-                            payload.answer,
-                            list(evidence_bundles),
-                            fallback_language=fallback_language,
-                            question_type=question_type,
-                        )
-                        payload = payload.model_copy(
-                            update={"answer": pruned.answer}
-                        )
-
-                        if pruned.fallback_used:
-                            return apply_contract(payload, [], True)
-
-                        try:
-                            citations, insufficient = self._validate_answer(
-                                answer=payload.answer,
-                                available_source_count=available_source_count,
-                                attempt="deterministic_pruning",
-                                evidence_bundles=evidence_bundles,
-                            )
-                        except CitationValidationError as pruning_error:
-                            LOGGER.warning(
-                                "RAG deterministic pruning fallback "
-                                "reason=%s",
-                                pruning_error,
-                            )
-                            fallback = prune_unsupported_claims(
-                                "",
-                                list(evidence_bundles),
-                                fallback_language=fallback_language,
-                            )
-                            payload = payload.model_copy(
-                                update={"answer": fallback.answer}
-                            )
-                            return apply_contract(payload, [], True)
-
-                        LOGGER.info(
-                            "RAG deterministic pruning removed_claims=%d "
-                            "inherited_citations=%d fallback=%s "
-                            "missing_required=%s atomic_plan=%s "
-                            "reconstructed_claims=%d",
-                            len(pruned.removed_claims),
-                            pruned.inherited_citation_count,
-                            pruned.fallback_used,
-                            pruned.missing_required_concepts,
-                            pruned.atomic_plan_used,
-                            pruned.reconstructed_claim_count,
-                        )
-                        return apply_contract(
-                            payload,
-                            citations,
-                            insufficient,
-                        )
-                else:
-                    return apply_contract(
-                        payload,
-                        citations,
-                        insufficient,
-                    )
-
-            LOGGER.warning(
-                "RAG output rejected attempt=%s reason=%s "
-                "available_sources=%d",
-                attempt,
-                rejection,
-                available_source_count,
-            )
-
-            if attempt_index == 1:
-                LOGGER.error(
-                    "RAG output invalid after repair reason=%s raw_output=%r",
-                    rejection,
-                    raw_output,
-                )
-                raise RAGResponseValidationError(
-                    "Réponse Qwen invalide après une réparation : "
-                    f"{rejection}"
-                ) from rejection
-
-            prompt = build_repair_prompt(
-                original_prompt=user_prompt,
-                invalid_output=raw_output,
-                rejection_reason=str(rejection),
-                json_output=True,
-            )
-            active_system_prompt = repair_system_prompt
-
-        raise AssertionError("La boucle de réparation aurait dû se terminer.")
+        except CitationValidationError as error:
+            raise RAGResponseValidationError(f"Réponse Qwen invalide : {error}") from error
+        return payload, citations, insufficient

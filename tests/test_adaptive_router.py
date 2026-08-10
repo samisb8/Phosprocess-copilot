@@ -44,14 +44,14 @@ def test_empty_anaphoric_translation_does_not_bypass_retrieval() -> None:
     assert decision.path is RequestPath.DOMAIN_RAG
 
 
-def test_obvious_general_question_bypasses_domain_retrieval() -> None:
+def test_factual_question_uses_fail_closed_documentary_rag() -> None:
     decision = decide_request_path(
         "Who is Victor Hugo?",
         source_mode="auto",
     )
 
-    assert decision.path is RequestPath.DIRECT_LLM
-    assert decision.direct_intent is DirectIntent.GENERAL
+    assert decision.path is RequestPath.DOMAIN_RAG
+    assert decision.direct_intent is None
 
 
 def test_technical_definition_does_not_use_general_bypass() -> None:

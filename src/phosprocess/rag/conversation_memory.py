@@ -13,9 +13,7 @@ _CITATION = re.compile(r"\[Source [1-9]\d*\]")
 _TECHNICAL_LINE = re.compile(
     r"(?im)^\s*(?:sources?|chunks?|scores?|rrf|reranker|bm25|dense)\s*:.*$"
 )
-_TECHNICAL_SUFFIX = re.compile(
-    r"(?i)\b(?:sources?|chunks?|scores?|rrf|reranker|bm25|dense)\s*:.*$"
-)
+_TECHNICAL_SUFFIX = re.compile(r"(?i)\b(?:sources?|chunks?|scores?|rrf|reranker|bm25|dense)\s*:.*$")
 _WHITESPACE = re.compile(r"\s+")
 
 
@@ -96,20 +94,18 @@ class ConversationMemory:
         if recent_turns <= 0:
             raise ValueError("recent_turns doit être positif.")
 
-        if min(
-            summary_max_tokens,
-            recent_history_max_tokens,
-            total_history_max_tokens,
-        ) <= 0:
+        if (
+            min(
+                summary_max_tokens,
+                recent_history_max_tokens,
+                total_history_max_tokens,
+            )
+            <= 0
+        ):
             raise ValueError("Les budgets mémoire doivent être positifs.")
 
-        if (
-            summary_max_tokens + recent_history_max_tokens
-            > total_history_max_tokens
-        ):
-            raise ValueError(
-                "Les budgets résumé + fenêtre dépassent le budget total."
-            )
+        if summary_max_tokens + recent_history_max_tokens > total_history_max_tokens:
+            raise ValueError("Les budgets résumé + fenêtre dépassent le budget total.")
 
         self.enabled = enabled
         self.recent_turn_limit = recent_turns
@@ -185,16 +181,12 @@ class ConversationMemory:
 
         while len(self._recent_turns) > self.recent_turn_limit:
             evicted = self._recent_turns.pop(0)
-            fragment = (
-                f"Sujet : {evicted.user} "
-                f"Éléments discutés : {evicted.assistant}"
-            )
+            fragment = f"Sujet : {evicted.user} Éléments discutés : {evicted.assistant}"
             self._summary_fragments.append(fragment)
             updated = True
 
         while (
-            estimate_tokens(" ".join(self._summary_fragments))
-            > self.summary_max_tokens
+            estimate_tokens(" ".join(self._summary_fragments)) > self.summary_max_tokens
             and len(self._summary_fragments) > 1
         ):
             self._summary_fragments.pop(0)
@@ -257,10 +249,7 @@ class ConversationMemory:
             break
 
         turns.reverse()
-        recent_tokens = sum(
-            estimate_tokens(f"{turn.user}\n{turn.assistant}")
-            for turn in turns
-        )
+        recent_tokens = sum(estimate_tokens(f"{turn.user}\n{turn.assistant}") for turn in turns)
         summary_tokens = estimate_tokens(summary)
         total_tokens = summary_tokens + recent_tokens
 
@@ -282,9 +271,7 @@ class ConversationMemory:
             summary_token_count=summary_tokens,
             recent_history_token_count=recent_tokens,
             total_token_count=total_tokens,
-            business_state=ConversationState(
-                **asdict(self.state)
-            ),
+            business_state=ConversationState(**asdict(self.state)),
         )
 
     def clear(self) -> None:
@@ -322,10 +309,7 @@ class ConversationMemory:
         return {
             "strategy": "summary_buffer",
             "summary": context.summary,
-            "recent_turns": [
-                asdict(turn)
-                for turn in context.recent_turns
-            ],
+            "recent_turns": [asdict(turn) for turn in context.recent_turns],
             "token_usage": self.token_usage(),
             "business_state": self.state.debug_view(),
         }

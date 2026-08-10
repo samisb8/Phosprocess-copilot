@@ -39,14 +39,8 @@ def select_with_lexical_safeguard(
     if lexical_slots >= top_k:
         raise ValueError("lexical_slots doit être inférieur à top_k.")
 
-    candidate_by_id = {
-        candidate.chunk.chunk_id: candidate
-        for candidate in candidates
-    }
-    reranked_by_id = {
-        result.chunk.chunk_id: result
-        for result in reranked_results
-    }
+    candidate_by_id = {candidate.chunk.chunk_id: candidate for candidate in candidates}
+    reranked_by_id = {result.chunk.chunk_id: result for result in reranked_results}
 
     if len(candidate_by_id) != len(candidates):
         raise ValueError("Les candidats hybrides contiennent un doublon.")
@@ -63,20 +57,10 @@ def select_with_lexical_safeguard(
         )
 
     reranker_slots = top_k - lexical_slots
-    selected_ids = [
-        result.chunk.chunk_id
-        for result in reranked_results[:reranker_slots]
-    ]
-    selection_source = {
-        chunk_id: "reranker"
-        for chunk_id in selected_ids
-    }
+    selected_ids = [result.chunk.chunk_id for result in reranked_results[:reranker_slots]]
+    selection_source = {chunk_id: "reranker" for chunk_id in selected_ids}
     lexical_candidates = sorted(
-        (
-            candidate
-            for candidate in candidates
-            if candidate.bm25_rank is not None
-        ),
+        (candidate for candidate in candidates if candidate.bm25_rank is not None),
         key=lambda candidate: (
             candidate.bm25_rank,
             candidate.rank,
@@ -107,8 +91,7 @@ def select_with_lexical_safeguard(
 
     if len(selected_ids) < min(top_k, len(candidates)):
         raise ValueError(
-            "Le reranker ne fournit pas assez de résultats pour compléter "
-            "la sélection v3."
+            "Le reranker ne fournit pas assez de résultats pour compléter la sélection v3."
         )
 
     return [
@@ -116,11 +99,7 @@ def select_with_lexical_safeguard(
             rank=rank,
             chunk_id=chunk_id,
             source=selection_source[chunk_id],
-            reranker_rank=(
-                reranked_by_id[chunk_id].rank
-                if chunk_id in reranked_by_id
-                else None
-            ),
+            reranker_rank=(reranked_by_id[chunk_id].rank if chunk_id in reranked_by_id else None),
             hybrid_rank=candidate_by_id[chunk_id].rank,
             bm25_rank=candidate_by_id[chunk_id].bm25_rank,
         )

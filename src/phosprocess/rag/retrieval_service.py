@@ -12,7 +12,6 @@ from phosprocess.observability.latency import RAGLatencyMetrics
 from phosprocess.rag.context_window import (
     PreparedDocumentContext,
     prepare_document_context,
-    query_terms,
 )
 from phosprocess.rag.quality_retrieval import QualityRetrievalResult
 from phosprocess.rag.question_classifier import classify_question
@@ -39,7 +38,7 @@ class RAGConfigurationError(RAGError):
 
 
 class RAGRetrievalError(RAGError):
-    """Raised when retrieval cannot produce five grounded sources."""
+    """Raised when retrieval cannot produce grounded evidence."""
 
 
 class RAGGenerationError(RAGError):
@@ -83,18 +82,100 @@ class RetrievalService:
         if engine is None:
             raise RAGRetrievalError("L'index qualité n'est pas actif.")
 
+        quality_mode = self._quality_source_mode(source_mode)
+
+        attempt_count = 1
+        source_fallback_used = False
+
         try:
-            result = engine.retrieve(
-                original_question,
-                standalone_query=query,
-                question_type=question_type,
-                source_mode=self._quality_source_mode(source_mode),
-                candidate_k=self.frozen_config.candidate_k,
-                dense_candidate_k=self.frozen_config.dense_candidates,
-                bm25_candidate_k=self.frozen_config.bm25_candidates,
-                top_k=self.frozen_config.top_k,
-                lexical_slots=self.frozen_config.lexical_slots,
+            discover = getattr(
+                engine,
+                "discover_documents",
+                None,
             )
+
+            if quality_mode == "auto" and callable(discover):
+                ranking = discover(
+                    original_question,
+                    standalone_query=query,
+                    question_type=question_type,
+                    candidate_k=self.frozen_config.candidate_k,
+                    dense_candidate_k=(self.frozen_config.dense_candidates),
+                    bm25_candidate_k=(self.frozen_config.bm25_candidates),
+                )
+
+                result = None
+                last_document_error: Exception | None = None
+
+                for (
+                    attempt_count,
+                    ranked_document,
+                ) in enumerate(
+                    ranking,
+                    start=1,
+                ):
+                    try:
+                        result = engine.retrieve(
+                            original_question,
+                            standalone_query=query,
+                            question_type=question_type,
+                            source_mode="auto",
+                            candidate_k=(self.frozen_config.candidate_k),
+                            dense_candidate_k=(self.frozen_config.dense_candidates),
+                            bm25_candidate_k=(self.frozen_config.bm25_candidates),
+                            top_k=self.frozen_config.top_k,
+                            lexical_slots=(self.frozen_config.lexical_slots),
+                            document_ids={ranked_document.document_id},
+                        )
+
+                        bundle_documents = {bundle.document_id for bundle in result.bundles}
+
+                        if bundle_documents != {ranked_document.document_id}:
+                            raise ValueError("Le deep retrieval n'a pas respect? le source lock.")
+
+                        source_fallback_used = attempt_count > 1
+
+                        break
+
+                    except Exception as document_error:
+                        last_document_error = document_error
+
+                        LOGGER.warning(
+                            "DOCUMENT_LOCK_ATTEMPT_FAILED attempt=%d document=%s reason=%s",
+                            attempt_count,
+                            ranked_document.document_id,
+                            document_error,
+                        )
+
+                        result = None
+
+                if result is None:
+                    if last_document_error is not None:
+                        raise last_document_error
+
+                    raise ValueError("Aucun document class? n'a fourni un contexte suffisant.")
+
+                LOGGER.info(
+                    "DOCUMENT_LOCK_SELECTED document=%s attempt=%d fallback=%s ranking=%s",
+                    result.routing.preferred_documents[0],
+                    attempt_count,
+                    source_fallback_used,
+                    " | ".join(item.document_id for item in ranking),
+                )
+
+            else:
+                result = engine.retrieve(
+                    original_question,
+                    standalone_query=query,
+                    question_type=question_type,
+                    source_mode=quality_mode,
+                    candidate_k=self.frozen_config.candidate_k,
+                    dense_candidate_k=(self.frozen_config.dense_candidates),
+                    bm25_candidate_k=(self.frozen_config.bm25_candidates),
+                    top_k=self.frozen_config.top_k,
+                    lexical_slots=(self.frozen_config.lexical_slots),
+                )
+
         except Exception as error:
             detail = str(error).strip() or repr(error)
             LOGGER.error(
@@ -109,8 +190,7 @@ class RetrievalService:
                 query,
             )
             raise RAGRetrievalError(
-                "La recherche structurée qualité a échoué : "
-                f"{type(error).__name__}: {detail}"
+                f"La recherche structurée qualité a échoué : {type(error).__name__}: {detail}"
             ) from error
 
         LOGGER.info(
@@ -121,10 +201,7 @@ class RetrievalService:
             result.routing.source_mode,
             result.routing.explicit_source or "none",
             result.routing.temporal_scope,
-            ",".join(
-                domain.value
-                for domain, _confidence in result.routing.detected_domains
-            )
+            ",".join(domain.value for domain, _confidence in result.routing.detected_domains)
             or "none",
             (
                 result.routing.preferred_documents[0]
@@ -143,26 +220,18 @@ class RetrievalService:
             result.query.dense_query,
             result.query.bm25_expanded_query,
             result.query.added_terms,
-            tuple(
-                domain.value
-                for domain, _confidence in result.routing.detected_domains
-            ),
+            tuple(domain.value for domain, _confidence in result.routing.detected_domains),
             result.routing.preferred_documents,
             result.routing.hard_filter,
         )
 
         candidate_by_id = {
-            candidate.chunk.chunk_id: candidate
-            for candidate in result.hybrid.results
+            candidate.chunk.chunk_id: candidate for candidate in result.hybrid.results
         }
         reranked_by_id = {
-            reranked.chunk.chunk_id: reranked
-            for reranked in result.reranking.results
+            reranked.chunk.chunk_id: reranked for reranked in result.reranking.results
         }
-        selection_by_id = {
-            selection.chunk_id: selection
-            for selection in result.selected
-        }
+        selection_by_id = {selection.chunk_id: selection for selection in result.selected}
         sources: list[RAGSource] = []
 
         for bundle in result.bundles:
@@ -184,12 +253,16 @@ class RetrievalService:
                     page_start=bundle.page_start,
                     page_end=bundle.page_end,
                     anchor_chunk_id=bundle.anchor_chunk_id,
+                    anchor_chunk_ids=list(bundle.anchor_chunk_ids),
                     expanded_chunk_ids=list(bundle.expanded_chunk_ids),
+                    supporting_chunk_ids=list(bundle.supporting_chunk_ids),
                     display_text=bundle.display_text,
                     anchor_text=child.display_text,
                     domain=", ".join(child.domains),
                     chunk_type=child.chunk_type.value,
                     parent_id=child.parent_id,
+                    context_scope=bundle.context_scope.value,
+                    best_anchor_score=bundle.best_anchor_score,
                     source_boost=result.source_boosts.get(
                         bundle.anchor_chunk_id,
                         0.0,
@@ -203,25 +276,15 @@ class RetrievalService:
                     dense_score=candidate.dense_score,
                     bm25_rank=candidate.bm25_rank,
                     bm25_score=candidate.bm25_score,
-                    reranker_rank=(
-                        reranked.rank if reranked is not None else None
-                    ),
-                    reranker_score=(
-                        reranked.reranker_score
-                        if reranked is not None
-                        else None
-                    ),
+                    reranker_rank=(reranked.rank if reranked is not None else None),
+                    reranker_score=(reranked.reranker_score if reranked is not None else None),
                 )
             )
 
         detected_domains = tuple(
-            domain.value
-            for domain, _confidence in result.routing.detected_domains
+            domain.value for domain, _confidence in result.routing.detected_domains
         )
-        catalog_by_id = {
-            entry.document_id: entry
-            for entry in engine.catalog.documents
-        }
+        catalog_by_id = {entry.document_id: entry for entry in engine.catalog.documents}
         preferred_files = tuple(
             catalog_by_id[document_id].canonical_filename
             for document_id in result.routing.preferred_documents
@@ -232,12 +295,10 @@ class RetrievalService:
             mode=result.routing.source_mode,
             primary_source=primary,
             preferred_sources=preferred_files,
-            selected_scope=tuple(
-                dict.fromkeys(bundle.filename for bundle in result.bundles)
-            ),
-            fallback_used=False,
-            forced=result.routing.hard_filter is not None,
-            attempt_count=1,
+            selected_scope=tuple(dict.fromkeys(bundle.filename for bundle in result.bundles)),
+            fallback_used=source_fallback_used,
+            forced=(quality_mode != "auto" and result.routing.hard_filter is not None),
+            attempt_count=attempt_count,
             sufficient_preferred_chunks=sum(
                 bundle.document_id in result.routing.preferred_documents
                 for bundle in result.bundles
@@ -264,9 +325,7 @@ class RetrievalService:
             candidates=list(result.hybrid.results),
             selected=list(result.selected),
             sources=sources,
-            source_texts=[
-                bundle.display_text for bundle in result.bundles
-            ],
+            source_texts=[bundle.display_text for bundle in result.bundles],
             hybrid_response=result.hybrid,
             reranked_response=result.reranking,
             quality_result=result,
@@ -285,7 +344,7 @@ class RetrievalService:
         source_mode: str,
         metrics: RAGLatencyMetrics | None = None,
     ) -> _RetrievedContext:
-        """Apply production document routing around the frozen retrieval."""
+        """Retrieve globally unless the user explicitly locks one source."""
 
         if self.quality_engine is not None:
             classification = classify_question(query)
@@ -297,7 +356,6 @@ class RetrievalService:
                 metrics=metrics,
             )
 
-        config = self.runtime_config.source_policy
         decision = self._decide_source_policy(
             policy_question,
             mode=source_mode,
@@ -309,18 +367,23 @@ class RetrievalService:
             metrics.source_policy_primary = decision.primary_label
             metrics.source_policy_forced = decision.forced
 
-        if decision.route == "disabled":
-            retrieved = self._retrieve(query, metrics=metrics)
+        if decision.forced and decision.primary_source is not None:
+            scope = (decision.primary_source,)
+            retrieved = self._retrieve(
+                query,
+                metrics=metrics,
+                document_ids=self._document_ids(scope),
+            )
             application = AppliedSourcePolicy(
                 route=decision.route,
                 mode=decision.mode,
-                primary_source=None,
-                preferred_sources=decision.preferred_sources,
-                selected_scope=config.default_priority,
+                primary_source=decision.primary_source,
+                preferred_sources=scope,
+                selected_scope=scope,
                 fallback_used=False,
-                forced=False,
+                forced=True,
                 attempt_count=1,
-                sufficient_preferred_chunks=0,
+                sufficient_preferred_chunks=len(retrieved.selected),
             )
             return self._attach_source_policy(
                 retrieved,
@@ -328,152 +391,26 @@ class RetrievalService:
                 metrics=metrics,
             )
 
-        primary_scope = (
-            (decision.primary_source,)
-            if decision.primary_source is not None
-            else decision.preferred_sources
+        retrieved = self._retrieve(
+            query,
+            metrics=metrics,
         )
-        attempts = 1
-        primary_retrieved: _RetrievedContext | None = None
-        primary_error: RAGRetrievalError | None = None
-
-        try:
-            primary_retrieved = self._retrieve(
-                query,
-                metrics=metrics,
-                document_ids=self._document_ids(primary_scope),
-            )
-        except RAGRetrievalError as error:
-            primary_error = error
-
-        sufficient_count = (
-            self._count_sufficient_preferred_chunks(
-                primary_retrieved,
-                query=query,
-                preferred_sources=primary_scope,
-            )
-            if primary_retrieved is not None
-            else 0
+        application = AppliedSourcePolicy(
+            route="automatic_global",
+            mode="automatic",
+            primary_source=None,
+            preferred_sources=(),
+            selected_scope=self._active_source_filenames(),
+            fallback_used=False,
+            forced=False,
+            attempt_count=1,
+            sufficient_preferred_chunks=0,
         )
-
-        if decision.forced:
-            if primary_retrieved is None:
-                raise RAGRetrievalError(
-                    "La source forcée ne fournit pas vingt candidats "
-                    "permettant de conserver cinq chunks."
-                ) from primary_error
-
-            application = AppliedSourcePolicy(
-                route=decision.route,
-                mode=decision.mode,
-                primary_source=decision.primary_source,
-                preferred_sources=decision.preferred_sources,
-                selected_scope=primary_scope,
-                fallback_used=False,
-                forced=True,
-                attempt_count=attempts,
-                sufficient_preferred_chunks=sufficient_count,
-            )
-            return self._attach_source_policy(
-                primary_retrieved,
-                application,
-                metrics=metrics,
-            )
-
-        if (
-            primary_retrieved is not None
-            and sufficient_count >= config.minimum_preferred_chunks
-        ):
-            application = AppliedSourcePolicy(
-                route=decision.route,
-                mode=decision.mode,
-                primary_source=decision.primary_source,
-                preferred_sources=decision.preferred_sources,
-                selected_scope=primary_scope,
-                fallback_used=False,
-                forced=False,
-                attempt_count=attempts,
-                sufficient_preferred_chunks=sufficient_count,
-            )
-            return self._attach_source_policy(
-                primary_retrieved,
-                application,
-                metrics=metrics,
-            )
-
-        if not decision.allow_fallback:
-            if primary_retrieved is not None:
-                return self._attach_source_policy(
-                    primary_retrieved,
-                    AppliedSourcePolicy(
-                        route=decision.route,
-                        mode=decision.mode,
-                        primary_source=decision.primary_source,
-                        preferred_sources=decision.preferred_sources,
-                        selected_scope=primary_scope,
-                        fallback_used=False,
-                        forced=False,
-                        attempt_count=attempts,
-                        sufficient_preferred_chunks=sufficient_count,
-                    ),
-                    metrics=metrics,
-                )
-
-            raise RAGRetrievalError(
-                "La source prioritaire est insuffisante et le fallback "
-                "documentaire est désactivé."
-            ) from primary_error
-
-        fallback_sources = self._available_fallback_sources(
-            config.default_priority
+        return self._attach_source_policy(
+            retrieved,
+            application,
+            metrics=metrics,
         )
-        fallback_scopes = (
-            [decision.preferred_sources, fallback_sources]
-            if len(decision.preferred_sources) > 1
-            else [fallback_sources]
-        )
-        unique_scopes: list[tuple[str, ...]] = []
-
-        for scope in fallback_scopes:
-            if scope not in unique_scopes and scope != primary_scope:
-                unique_scopes.append(scope)
-
-        last_error = primary_error
-
-        for scope in unique_scopes:
-            attempts += 1
-
-            try:
-                fallback_retrieved = self._retrieve(
-                    query,
-                    metrics=metrics,
-                    document_ids=self._document_ids(scope),
-                )
-            except RAGRetrievalError as error:
-                last_error = error
-                continue
-
-            application = AppliedSourcePolicy(
-                route=decision.route,
-                mode=decision.mode,
-                primary_source=decision.primary_source,
-                preferred_sources=decision.preferred_sources,
-                selected_scope=scope,
-                fallback_used=True,
-                forced=False,
-                attempt_count=attempts,
-                sufficient_preferred_chunks=sufficient_count,
-            )
-            return self._attach_source_policy(
-                fallback_retrieved,
-                application,
-                metrics=metrics,
-            )
-
-        raise RAGRetrievalError(
-            "La politique documentaire n'a pas trouvé cinq chunks "
-            "exploitables, y compris avec fallback."
-        ) from last_error
 
     def _decide_source_policy(
         self,
@@ -481,16 +418,17 @@ class RetrievalService:
         *,
         mode: str,
     ) -> SourcePolicyDecision:
-        """Apply static routes plus deterministic active-document mentions."""
+        """Honor explicit source requests; automatic mode stays global."""
 
-        config = self.runtime_config.source_policy
+        normalized_mode = mode.strip().casefold()
+        if normalized_mode == "auto":
+            normalized_mode = "automatic"
 
-        if mode.strip().casefold() == "automatic" and config.enabled:
+        if normalized_mode == "automatic":
             explicit_source = detect_explicit_active_source(
                 question,
                 self._active_source_filenames(),
             )
-
             if explicit_source is not None:
                 return SourcePolicyDecision(
                     route="explicit_document",
@@ -503,7 +441,7 @@ class RetrievalService:
 
         return decide_source_policy(
             question,
-            config=config,
+            config=self.runtime_config.source_policy,
             mode=mode,
         )
 
@@ -523,72 +461,7 @@ class RetrievalService:
     def _document_ids(sources: Sequence[str]) -> set[str]:
         """Build exact indexed document IDs from configured filenames."""
 
-        return {
-            document_id_from_source(source)
-            for source in sources
-        }
-
-    def _available_fallback_sources(
-        self,
-        configured_priority: Sequence[str],
-    ) -> tuple[str, ...]:
-        """Append active user-managed PDFs after configured priorities."""
-
-        available = list(self._active_source_filenames())
-        return tuple(
-            dict.fromkeys(
-                [
-                    *configured_priority,
-                    *available,
-                ]
-            )
-        )
-
-    @staticmethod
-    def _count_sufficient_preferred_chunks(
-        retrieved: _RetrievedContext,
-        *,
-        query: str,
-        preferred_sources: Sequence[str],
-    ) -> int:
-        """Count strong preferred passages using only runtime retrieval data."""
-
-        allowed_documents = {
-            document_id_from_source(source)
-            for source in preferred_sources
-        }
-        candidate_by_id = {
-            candidate.chunk.chunk_id: candidate
-            for candidate in retrieved.candidates
-        }
-        terms = query_terms(query)
-        count = 0
-
-        for selection in retrieved.selected:
-            candidate = candidate_by_id[selection.chunk_id]
-            chunk = candidate.chunk
-
-            if chunk.document_id not in allowed_documents:
-                continue
-
-            matched_by_both = (
-                candidate.dense_rank is not None
-                and candidate.bm25_rank is not None
-            )
-            passage_terms = query_terms(
-                " ".join(
-                    [
-                        " ".join(chunk.heading_path),
-                        chunk.embedding_text,
-                    ]
-                )
-            )
-            lexical_support = bool(terms & passage_terms)
-
-            if matched_by_both or lexical_support:
-                count += 1
-
-        return count
+        return {document_id_from_source(source) for source in sources}
 
     @staticmethod
     def _attach_source_policy(
@@ -605,12 +478,8 @@ class RetrievalService:
             metrics.source_policy_route = application.route
             metrics.source_policy_mode = application.mode
             metrics.source_policy_primary = application.primary_label
-            metrics.source_policy_fallback_used = (
-                application.fallback_used
-            )
-            metrics.source_policy_attempt_count = (
-                application.attempt_count
-            )
+            metrics.source_policy_fallback_used = application.fallback_used
+            metrics.source_policy_attempt_count = application.attempt_count
             metrics.source_policy_sufficient_preferred_chunks = (
                 application.sufficient_preferred_chunks
             )
@@ -637,11 +506,7 @@ class RetrievalService:
         """Run exact frozen hybrid → reranker → safeguard sequence."""
 
         self._active_metrics = metrics
-        embedding_before = (
-            metrics.embedding_ms
-            if metrics is not None
-            else 0.0
-        )
+        embedding_before = metrics.embedding_ms if metrics is not None else 0.0
 
         if metrics is not None:
             expansion_started = time.perf_counter()
@@ -655,9 +520,7 @@ class RetrievalService:
                 query,
                 version=expansion_version,
             )
-            metrics.query_expansion_ms += (
-                time.perf_counter() - expansion_started
-            ) * 1000.0
+            metrics.query_expansion_ms += (time.perf_counter() - expansion_started) * 1000.0
 
         try:
             hybrid_response = self.retriever.search(
@@ -669,23 +532,13 @@ class RetrievalService:
                 use_query_expansion=self.frozen_config.query_expansion,
             )
         except Exception as error:
-            raise RAGRetrievalError(
-                "La recherche hybride a échoué."
-            ) from error
+            raise RAGRetrievalError("La recherche hybride a échoué.") from error
 
         if metrics is not None:
-            dense_duration_ms = float(
-                getattr(hybrid_response, "dense_duration_ms", 0.0)
-            )
-            bm25_duration_ms = float(
-                getattr(hybrid_response, "bm25_duration_ms", 0.0)
-            )
-            hybrid_total_ms = float(
-                getattr(hybrid_response, "total_duration_ms", 0.0)
-            )
-            attempt_embedding_ms = (
-                metrics.embedding_ms - embedding_before
-            )
+            dense_duration_ms = float(getattr(hybrid_response, "dense_duration_ms", 0.0))
+            bm25_duration_ms = float(getattr(hybrid_response, "bm25_duration_ms", 0.0))
+            hybrid_total_ms = float(getattr(hybrid_response, "total_duration_ms", 0.0))
+            attempt_embedding_ms = metrics.embedding_ms - embedding_before
             metrics.dense_search_ms += max(
                 0.0,
                 dense_duration_ms - attempt_embedding_ms,
@@ -693,39 +546,24 @@ class RetrievalService:
             metrics.bm25_search_ms += bm25_duration_ms
             metrics.hybrid_fusion_ms += max(
                 0.0,
-                hybrid_total_ms
-                - dense_duration_ms
-                - bm25_duration_ms,
+                hybrid_total_ms - dense_duration_ms - bm25_duration_ms,
             )
 
         phase_started = time.perf_counter()
         candidates = list(hybrid_response.results)
-        candidate_ids = [
-            result.chunk.chunk_id
-            for result in candidates
-        ]
+        candidate_ids = [result.chunk.chunk_id for result in candidates]
 
         if len(candidates) != self.frozen_config.candidate_k:
-            raise RAGRetrievalError(
-                "Le retriever doit conserver exactement 20 candidats."
-            )
+            raise RAGRetrievalError("Le retriever doit conserver exactement 20 candidats.")
 
         if len(candidate_ids) != len(set(candidate_ids)):
-            raise RAGRetrievalError(
-                "Le retriever a retourné des chunks dupliqués."
-            )
+            raise RAGRetrievalError("Le retriever a retourné des chunks dupliqués.")
 
         if metrics is not None:
-            metrics.candidate_preparation_ms += (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.candidate_preparation_ms += (time.perf_counter() - phase_started) * 1000.0
 
         phase_started = time.perf_counter()
-        tokenization_before = (
-            metrics.reranker_tokenization_ms
-            if metrics is not None
-            else 0.0
-        )
+        tokenization_before = metrics.reranker_tokenization_ms if metrics is not None else 0.0
 
         try:
             reranked_response = self.reranker.rerank(
@@ -734,13 +572,9 @@ class RetrievalService:
                 top_k=self.frozen_config.candidate_k,
             )
         except Exception as error:
-            raise RAGRetrievalError(
-                "Le reranking BGE a échoué."
-            ) from error
+            raise RAGRetrievalError("Le reranking BGE a échoué.") from error
 
-        reranking_total_ms = (
-            time.perf_counter() - phase_started
-        ) * 1000.0
+        reranking_total_ms = (time.perf_counter() - phase_started) * 1000.0
 
         if metrics is not None:
             metrics.reranking_ms += reranking_total_ms
@@ -751,22 +585,16 @@ class RetrievalService:
                     reranking_total_ms,
                 )
             )
-            attempt_tokenization_ms = (
-                metrics.reranker_tokenization_ms
-                - tokenization_before
-            )
+            attempt_tokenization_ms = metrics.reranker_tokenization_ms - tokenization_before
             metrics.reranker_scoring_ms += max(
                 0.0,
-                reranker_internal_ms
-                - attempt_tokenization_ms,
+                reranker_internal_ms - attempt_tokenization_ms,
             )
 
         reranked_results = list(reranked_response.results)
 
         if len(reranked_results) != len(candidates):
-            raise RAGRetrievalError(
-                "Le reranker doit conserver les 20 candidats."
-            )
+            raise RAGRetrievalError("Le reranker doit conserver les 20 candidats.")
 
         phase_started = time.perf_counter()
 
@@ -778,22 +606,17 @@ class RetrievalService:
                 lexical_slots=self.frozen_config.lexical_slots,
             )
         except ValueError as error:
-            raise RAGRetrievalError(
-                "La sélection lexical_safeguard_001 a échoué."
-            ) from error
+            raise RAGRetrievalError("La sélection lexical_safeguard_001 a échoué.") from error
 
         if metrics is not None:
-            metrics.lexical_selection_ms += (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.lexical_selection_ms += (time.perf_counter() - phase_started) * 1000.0
 
         if (
             len(selected) != self.frozen_config.top_k
-            or len({result.chunk_id for result in selected})
-            != self.frozen_config.top_k
+            or len({result.chunk_id for result in selected}) != self.frozen_config.top_k
         ):
             raise RAGRetrievalError(
-                "La sélection finale doit contenir cinq chunks uniques."
+                "La sélection finale doit respecter top_k avec des chunks uniques."
             )
 
         phase_started = time.perf_counter()
@@ -804,9 +627,7 @@ class RetrievalService:
         )
 
         if metrics is not None:
-            metrics.source_loading_ms += (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.source_loading_ms += (time.perf_counter() - phase_started) * 1000.0
 
         return _RetrievedContext(
             candidates=candidates,
@@ -822,16 +643,12 @@ class RetrievalService:
         source_texts: Sequence[str],
         question: str,
     ) -> PreparedDocumentContext:
-        """Select bounded relevant excerpts for all five sources."""
+        """Select bounded relevant excerpts for all retrieved sources."""
 
         config = self.runtime_config.generation
         return prepare_document_context(
             source_texts,
             question,
-            maximum_tokens_per_source=(
-                config.max_context_tokens_per_source
-            ),
-            maximum_total_tokens=(
-                config.max_total_document_context_tokens
-            ),
+            maximum_tokens_per_source=(config.max_context_tokens_per_source),
+            maximum_total_tokens=(config.max_total_document_context_tokens),
         )

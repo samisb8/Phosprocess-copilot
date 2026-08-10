@@ -46,35 +46,22 @@ class RerankingConfig:
         """Valider les paramètres."""
 
         if not self.model_name.strip():
-            raise ValueError(
-                "Le nom du modèle de reranking ne peut pas être vide."
-            )
+            raise ValueError("Le nom du modèle de reranking ne peut pas être vide.")
 
         if self.batch_size <= 0:
-            raise ValueError(
-                "batch_size doit être strictement positif."
-            )
+            raise ValueError("batch_size doit être strictement positif.")
 
         if self.max_length <= 0:
-            raise ValueError(
-                "max_length doit être strictement positif."
-            )
+            raise ValueError("max_length doit être strictement positif.")
 
         if self.hybrid_candidate_k <= 0:
-            raise ValueError(
-                "hybrid_candidate_k doit être strictement positif."
-            )
+            raise ValueError("hybrid_candidate_k doit être strictement positif.")
 
         if self.final_top_k <= 0:
-            raise ValueError(
-                "final_top_k doit être strictement positif."
-            )
+            raise ValueError("final_top_k doit être strictement positif.")
 
         if self.final_top_k > self.hybrid_candidate_k:
-            raise ValueError(
-                "final_top_k ne peut pas dépasser "
-                "hybrid_candidate_k."
-            )
+            raise ValueError("final_top_k ne peut pas dépasser hybrid_candidate_k.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,18 +112,12 @@ def load_reranking_config(
     """Lire la configuration YAML du reranker."""
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Configuration introuvable : {config_path}"
-        )
+        raise FileNotFoundError(f"Configuration introuvable : {config_path}")
 
-    raw_config = yaml.safe_load(
-        config_path.read_text(encoding="utf-8")
-    )
+    raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(raw_config, dict):
-        raise ValueError(
-            "Le fichier reranking.yaml est invalide."
-        )
+        raise ValueError("Le fichier reranking.yaml est invalide.")
 
     model_config = raw_config.get("model")
     inference_config = raw_config.get("inference")
@@ -144,42 +125,26 @@ def load_reranking_config(
     passage_config = raw_config.get("passage")
 
     if not isinstance(model_config, dict):
-        raise ValueError(
-            "La section 'model' est absente ou invalide."
-        )
+        raise ValueError("La section 'model' est absente ou invalide.")
 
     if not isinstance(inference_config, dict):
-        raise ValueError(
-            "La section 'inference' est absente ou invalide."
-        )
+        raise ValueError("La section 'inference' est absente ou invalide.")
 
     if not isinstance(retrieval_config, dict):
-        raise ValueError(
-            "La section 'retrieval' est absente ou invalide."
-        )
+        raise ValueError("La section 'retrieval' est absente ou invalide.")
 
     if not isinstance(passage_config, dict):
-        raise ValueError(
-            "La section 'passage' est absente ou invalide."
-        )
+        raise ValueError("La section 'passage' est absente ou invalide.")
 
     return RerankingConfig(
         model_name=str(model_config["name"]),
         device=str(model_config.get("device", "auto")),
-        use_fp16=bool(
-            model_config.get("use_fp16", True)
-        ),
-        normalize_scores=bool(
-            model_config.get("normalize_scores", True)
-        ),
+        use_fp16=bool(model_config.get("use_fp16", True)),
+        normalize_scores=bool(model_config.get("normalize_scores", True)),
         batch_size=int(inference_config["batch_size"]),
         max_length=int(inference_config["max_length"]),
-        hybrid_candidate_k=int(
-            retrieval_config["hybrid_candidate_k"]
-        ),
-        final_top_k=int(
-            retrieval_config["final_top_k"]
-        ),
+        hybrid_candidate_k=int(retrieval_config["hybrid_candidate_k"]),
+        final_top_k=int(retrieval_config["final_top_k"]),
         include_source_file=bool(
             passage_config.get(
                 "include_source_file",
@@ -236,40 +201,20 @@ def build_reranking_passage(
     context_lines: list[str] = []
 
     if config.include_source_file:
-        document_name = (
-            Path(chunk.source_file)
-            .stem
-            .replace("_", " ")
-        )
+        document_name = Path(chunk.source_file).stem.replace("_", " ")
 
-        context_lines.append(
-            f"Document: {document_name}"
-        )
+        context_lines.append(f"Document: {document_name}")
 
-    if (
-        config.include_heading_path
-        and chunk.heading_path
-    ):
-        context_lines.append(
-            "Section: "
-            + " > ".join(chunk.heading_path)
-        )
+    if config.include_heading_path and chunk.heading_path:
+        context_lines.append("Section: " + " > ".join(chunk.heading_path))
 
-    passage_text = clean_passage_text(
-        chunk.text
-    )
+    passage_text = clean_passage_text(chunk.text)
 
     if not passage_text:
-        raise ValueError(
-            f"Le chunk {chunk.chunk_id} possède un texte vide."
-        )
+        raise ValueError(f"Le chunk {chunk.chunk_id} possède un texte vide.")
 
     if context_lines:
-        return (
-            "\n".join(context_lines)
-            + "\n\nPassage:\n"
-            + passage_text
-        )
+        return "\n".join(context_lines) + "\n\nPassage:\n" + passage_text
 
     return passage_text
 
@@ -282,25 +227,13 @@ class BGEReranker:
         config: RerankingConfig,
     ) -> None:
         self.config = config
-        self._device = self._resolve_device(
-            config.device
-        )
+        self._device = self._resolve_device(config.device)
 
-        effective_fp16 = (
-            config.use_fp16
-            and self._device.startswith("cuda")
-        )
+        effective_fp16 = config.use_fp16 and self._device.startswith("cuda")
 
-        devices: str | list[str] = (
-            [self._device]
-            if self._device.startswith("cuda")
-            else "cpu"
-        )
+        devices: str | list[str] = [self._device] if self._device.startswith("cuda") else "cpu"
 
-        print(
-            f"Chargement de {config.model_name} "
-            f"sur {self._device}..."
-        )
+        print(f"Chargement de {config.model_name} sur {self._device}...")
 
         self._model: Any = FlagReranker(
             config.model_name,
@@ -332,20 +265,12 @@ class BGEReranker:
         cleaned_query = query.strip()
 
         if not cleaned_query:
-            raise ValueError(
-                "La question de reranking ne peut pas être vide."
-            )
+            raise ValueError("La question de reranking ne peut pas être vide.")
 
-        effective_top_k = (
-            self.config.final_top_k
-            if top_k is None
-            else top_k
-        )
+        effective_top_k = self.config.final_top_k if top_k is None else top_k
 
         if effective_top_k <= 0:
-            raise ValueError(
-                "top_k doit être strictement positif."
-            )
+            raise ValueError("top_k doit être strictement positif.")
 
         if not candidates:
             return RerankingResponse(
@@ -358,15 +283,10 @@ class BGEReranker:
                 results=[],
             )
 
-        chunk_ids = [
-            candidate.chunk.chunk_id
-            for candidate in candidates
-        ]
+        chunk_ids = [candidate.chunk.chunk_id for candidate in candidates]
 
         if len(chunk_ids) != len(set(chunk_ids)):
-            raise ValueError(
-                "Les candidats contiennent des chunk_id dupliqués."
-            )
+            raise ValueError("Les candidats contiennent des chunk_id dupliqués.")
 
         pairs = [
             [
@@ -388,9 +308,7 @@ class BGEReranker:
 
         self._synchronize_cuda()
 
-        duration_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
+        duration_ms = (time.perf_counter() - start_time) * 1000
 
         scored_candidates = list(
             zip(
@@ -421,9 +339,7 @@ class BGEReranker:
                 reranker_score=float(score),
                 original_hybrid_rank=candidate.rank,
                 original_rrf_score=candidate.rrf_score,
-                matched_retrievers=(
-                    candidate.matched_retrievers
-                ),
+                matched_retrievers=(candidate.matched_retrievers),
                 dense_rank=candidate.dense_rank,
                 dense_score=candidate.dense_score,
                 bm25_rank=candidate.bm25_rank,
@@ -496,8 +412,7 @@ class BGEReranker:
 
                 if batch_size <= 1:
                     raise RuntimeError(
-                        "Mémoire GPU insuffisante pour le "
-                        "reranker même avec batch_size=1."
+                        "Mémoire GPU insuffisante pour le reranker même avec batch_size=1."
                     ) from error
 
                 previous_batch_size = batch_size
@@ -524,26 +439,17 @@ class BGEReranker:
 
         if scores.shape != (expected_count,):
             raise ValueError(
-                "Nombre de scores inattendu : "
-                f"{scores.shape}, attendu ({expected_count},)."
+                f"Nombre de scores inattendu : {scores.shape}, attendu ({expected_count},)."
             )
 
         if not np.isfinite(scores).all():
-            raise ValueError(
-                "Le reranker a produit NaN ou une valeur infinie."
-            )
+            raise ValueError("Le reranker a produit NaN ou une valeur infinie.")
 
         if self.config.normalize_scores:
-            outside_range = (
-                (scores < 0.0)
-                | (scores > 1.0)
-            )
+            outside_range = (scores < 0.0) | (scores > 1.0)
 
             if bool(outside_range.any()):
-                raise ValueError(
-                    "Les scores normalisés doivent être compris "
-                    "entre 0 et 1."
-                )
+                raise ValueError("Les scores normalisés doivent être compris entre 0 et 1.")
 
     def _is_cuda_oom(
         self,
@@ -560,10 +466,7 @@ class BGEReranker:
         ):
             return True
 
-        return (
-            "out of memory"
-            in str(error).casefold()
-        )
+        return "out of memory" in str(error).casefold()
 
     def _synchronize_cuda(self) -> None:
         """Synchroniser CUDA pour mesurer correctement la durée."""
@@ -577,22 +480,15 @@ class BGEReranker:
     ) -> str:
         """Choisir automatiquement GPU ou CPU."""
 
-        normalized = (
-            requested_device.strip().casefold()
-        )
+        normalized = requested_device.strip().casefold()
 
         if normalized == "auto":
-            return (
-                "cuda:0"
-                if torch.cuda.is_available()
-                else "cpu"
-            )
+            return "cuda:0" if torch.cuda.is_available() else "cpu"
 
         if normalized.startswith("cuda"):
             if not torch.cuda.is_available():
                 raise RuntimeError(
-                    "CUDA est demandé, mais PyTorch ne détecte "
-                    "aucun GPU compatible."
+                    "CUDA est demandé, mais PyTorch ne détecte aucun GPU compatible."
                 )
 
             return requested_device
@@ -600,7 +496,4 @@ class BGEReranker:
         if normalized == "cpu":
             return "cpu"
 
-        raise ValueError(
-            "device doit être 'auto', 'cpu' ou une valeur "
-            "comme 'cuda:0'."
-        )
+        raise ValueError("device doit être 'auto', 'cpu' ou une valeur comme 'cuda:0'.")

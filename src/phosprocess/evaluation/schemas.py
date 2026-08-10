@@ -33,9 +33,7 @@ class QueryCategory(StrEnum):
     OPERATOR_DIAGNOSIS = "operator_diagnosis"
     PROCESS_COMPARISON = "process_comparison"
     TABLE_DATA = "table_data"
-    IMPURITIES_LOSSES_CORROSION = (
-        "impurities_losses_corrosion"
-    )
+    IMPURITIES_LOSSES_CORROSION = "impurities_losses_corrosion"
     UNANSWERABLE = "unanswerable"
 
 
@@ -105,16 +103,10 @@ class EvaluationQuery(BaseModel):
     ) -> list[str]:
         """Nettoyer et dédupliquer les références."""
 
-        normalized = [
-            value.strip()
-            for value in values
-            if value.strip()
-        ]
+        normalized = [value.strip() for value in values if value.strip()]
 
         if len(normalized) != len(set(normalized)):
-            raise ValueError(
-                "reference_documents contient des doublons."
-            )
+            raise ValueError("reference_documents contient des doublons.")
 
         return normalized
 
@@ -127,39 +119,31 @@ class EvaluationQuery(BaseModel):
         if self.answerable:
             if self.category == QueryCategory.UNANSWERABLE:
                 raise ValueError(
-                    "Une question répondable ne peut pas avoir "
-                    "la catégorie unanswerable."
+                    "Une question répondable ne peut pas avoir la catégorie unanswerable."
                 )
 
             if not self.expected_answer:
-                raise ValueError(
-                    "Une question répondable doit contenir "
-                    "expected_answer."
-                )
+                raise ValueError("Une question répondable doit contenir expected_answer.")
 
             if not self.reference_documents:
                 raise ValueError(
-                    "Une question répondable doit contenir au "
-                    "moins un document de référence."
+                    "Une question répondable doit contenir au moins un document de référence."
                 )
 
         else:
             if self.category != QueryCategory.UNANSWERABLE:
                 raise ValueError(
-                    "Une question non répondable doit utiliser "
-                    "la catégorie unanswerable."
+                    "Une question non répondable doit utiliser la catégorie unanswerable."
                 )
 
             if self.expected_answer is not None:
                 raise ValueError(
-                    "Une question non répondable ne doit pas "
-                    "contenir expected_answer."
+                    "Une question non répondable ne doit pas contenir expected_answer."
                 )
 
             if self.reference_documents:
                 raise ValueError(
-                    "Une question non répondable ne doit pas "
-                    "déclarer de document de référence."
+                    "Une question non répondable ne doit pas déclarer de document de référence."
                 )
 
         return self
@@ -245,65 +229,40 @@ class ExpectedConfig(BaseModel):
         }
 
         language_groups = {
-            "answerable_languages": (
-                self.answerable_languages
-            ),
-            "unanswerable_languages": (
-                self.unanswerable_languages
-            ),
+            "answerable_languages": (self.answerable_languages),
+            "unanswerable_languages": (self.unanswerable_languages),
             "all_languages": self.all_languages,
         }
 
         for group_name, counts in language_groups.items():
             if set(counts) != expected_keys:
-                raise ValueError(
-                    f"{group_name} doit contenir exactement "
-                    "'fr', 'en' et 'mixed'."
-                )
+                raise ValueError(f"{group_name} doit contenir exactement 'fr', 'en' et 'mixed'.")
 
             if any(count < 0 for count in counts.values()):
-                raise ValueError(
-                    f"{group_name} contient un comptage négatif."
-                )
+                raise ValueError(f"{group_name} contient un comptage négatif.")
 
-        if (
-            sum(self.answerable_languages.values())
-            != self.answerable_queries
-        ):
+        if sum(self.answerable_languages.values()) != self.answerable_queries:
             raise ValueError(
-                "La somme de answerable_languages ne correspond "
-                "pas à answerable_queries."
+                "La somme de answerable_languages ne correspond pas à answerable_queries."
             )
 
-        if (
-            sum(self.unanswerable_languages.values())
-            != self.unanswerable_queries
-        ):
+        if sum(self.unanswerable_languages.values()) != self.unanswerable_queries:
             raise ValueError(
-                "La somme de unanswerable_languages ne correspond "
-                "pas à unanswerable_queries."
+                "La somme de unanswerable_languages ne correspond pas à unanswerable_queries."
             )
 
-        if (
-            sum(self.all_languages.values())
-            != self.total_queries
-        ):
+        if sum(self.all_languages.values()) != self.total_queries:
             raise ValueError(
-                "La somme de all_languages ne correspond pas "
-                "au nombre total de questions."
+                "La somme de all_languages ne correspond pas au nombre total de questions."
             )
 
         for language in expected_keys:
             expected_total = (
-                self.answerable_languages[language]
-                + self.unanswerable_languages[language]
+                self.answerable_languages[language] + self.unanswerable_languages[language]
             )
 
             if self.all_languages[language] != expected_total:
-                raise ValueError(
-                    "Répartition linguistique incohérente pour "
-                    f"{language}."
-                )
+                raise ValueError(f"Répartition linguistique incohérente pour {language}.")
 
         return self
 
@@ -327,23 +286,15 @@ class AnnotationConfig(BaseModel):
         """Contrôler l'échelle de pertinence."""
 
         if self.relevance_minimum != 0:
-            raise ValueError(
-                "La pertinence minimale doit être 0."
-            )
+            raise ValueError("La pertinence minimale doit être 0.")
 
         if self.relevance_maximum != 3:
-            raise ValueError(
-                "La pertinence maximale doit être 3."
-            )
+            raise ValueError("La pertinence maximale doit être 3.")
 
         if not (
-            self.relevance_minimum
-            <= self.binary_relevance_threshold
-            <= self.relevance_maximum
+            self.relevance_minimum <= self.binary_relevance_threshold <= self.relevance_maximum
         ):
-            raise ValueError(
-                "binary_relevance_threshold est hors limites."
-            )
+            raise ValueError("binary_relevance_threshold est hors limites.")
 
         expected_labels = set(
             range(
@@ -353,9 +304,7 @@ class AnnotationConfig(BaseModel):
         )
 
         if set(self.labels) != expected_labels:
-            raise ValueError(
-                "Les labels doivent couvrir exactement 0, 1, 2, 3."
-            )
+            raise ValueError("Les labels doivent couvrir exactement 0, 1, 2, 3.")
 
         return self
 
@@ -400,20 +349,11 @@ def load_evaluation_config(
     """Charger et valider evaluation.yaml."""
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Configuration introuvable : {config_path}"
-        )
+        raise FileNotFoundError(f"Configuration introuvable : {config_path}")
 
-    raw_config = yaml.safe_load(
-        config_path.read_text(encoding="utf-8")
-    )
+    raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(raw_config, dict):
-        raise ValueError(
-            "Le fichier evaluation.yaml doit contenir "
-            "un objet YAML."
-        )
+        raise ValueError("Le fichier evaluation.yaml doit contenir un objet YAML.")
 
-    return EvaluationConfig.model_validate(
-        raw_config
-    )
+    return EvaluationConfig.model_validate(raw_config)

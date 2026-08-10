@@ -54,8 +54,9 @@ def test_balance_question_uses_balance_profile_and_expansion() -> None:
     )
 
     assert classification.question_type is QuestionType.BALANCE
-    assert "material balance" in expanded.added_terms
-    assert "P2O5 balance" in expanded.added_terms
+    assert {"conservation relation", "inputs", "outputs", "variables", "units"}.issubset(
+        set(expanded.added_terms)
+    )
     assert "steady state" in expanded.bm25_expanded_query.casefold()
 
 
@@ -114,11 +115,11 @@ def test_hierarchy_representation_contains_all_levels() -> None:
     assert section.bm25_text.count(hierarchy) >= 2
 
 
-def test_process_flow_profile_rewards_feed_section() -> None:
+def test_process_flow_profile_rewards_generic_entry_section() -> None:
     section = _section(
         hierarchy_path=(
             "Phosphates and Phosphoric Acid > Acid Concentration Systems "
-            "> Weak acid feed inlet"
+            "> Process flow entry"
         ),
         chunk_types=(TechnicalChunkType.PROCESS_DESCRIPTION,),
     )
@@ -129,10 +130,10 @@ def test_process_flow_profile_rewards_feed_section() -> None:
         query="Describe the acid path through the evaporator.",
     )
 
-    assert score >= 0.085
+    assert score > 0
 
 
-def test_process_flow_dense_hints_cover_full_path() -> None:
+def test_process_flow_dense_hints_are_structural_only() -> None:
     question = (
         "Describe the path through a forced-circulation evaporator, "
         "from the feed inlet to the concentrated product outlet."
@@ -144,17 +145,18 @@ def test_process_flow_dense_hints_cover_full_path() -> None:
     )
 
     dense = expanded.dense_query.casefold()
-    assert "weak acid feed" in dense
-    assert "circulation pump heat exchanger" in dense
-    assert "flash chamber recirculation" in dense
-    assert "concentrated acid withdrawal" in dense
+    assert "process sequence" in dense
+    assert "entry transitions exit" in dense
+    assert "weak acid feed" not in dense
+    assert "conical bottom" not in dense
+    assert "concentrated acid withdrawal" not in dense
 
 
-def test_process_flow_profile_rewards_product_withdrawal_section() -> None:
+def test_process_flow_profile_rewards_generic_exit_section() -> None:
     section = _section(
         hierarchy_path=(
             "Phosphates and Phosphoric Acid > Acid Concentration Systems "
-            "> Concentrated acid product withdrawal"
+            "> Process flow exit"
         ),
         chunk_types=(TechnicalChunkType.PROCESS_DESCRIPTION,),
     )
@@ -165,4 +167,4 @@ def test_process_flow_profile_rewards_product_withdrawal_section() -> None:
         query="Describe the acid path through the evaporator.",
     )
 
-    assert score >= 0.085
+    assert score > 0

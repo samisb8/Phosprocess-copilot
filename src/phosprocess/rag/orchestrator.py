@@ -39,21 +39,17 @@ from phosprocess.rag.conversation_memory import (
     ConversationMemory,
 )
 from phosprocess.rag.conversation_state import ConversationState
-from phosprocess.rag.fidelity import enforce_answer_contract, prune_unsupported_claims
-from phosprocess.rag.followup_resolver import resolve_standalone_query
+from phosprocess.rag.followup_resolver import resolve_ambiguous_query_with_llm
 from phosprocess.rag.generation_service import (
     GenerationService,
-    _controlled_fallback_for_language,
 )
 from phosprocess.rag.language import detect_response_language
 from phosprocess.rag.prompts import (
-    REPAIR_SYSTEM_PROMPT,
     STREAMING_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     PromptPackage,
     build_prompt_package,
     build_quality_prompt_package,
-    build_repair_prompt,
     resolve_follow_up,
 )
 from phosprocess.rag.quality_retrieval import QualityRetrievalEngine
@@ -79,16 +75,12 @@ LOGGER = logging.getLogger("phosprocess.rag.pipeline")
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 DEFAULT_SNAPSHOT_DIRECTORY = (
-    PROJECT_ROOT
-    / "data"
-    / "evaluation"
-    / "retrieval"
-    / "v0.1"
-    / "frozen"
-    / "dev_best_v3"
+    PROJECT_ROOT / "data" / "evaluation" / "retrieval" / "v0.1" / "frozen" / "dev_best_v3"
 )
 
 DEFAULT_RUNTIME_CONFIG_PATH = PROJECT_ROOT / "configs" / "rag_production.yaml"
+
+DEFAULT_RAG_V1_CONFIG_PATH = PROJECT_ROOT / "configs" / "rag_v1.yaml"
 
 DEFAULT_EMBEDDING_CONFIG_PATH = PROJECT_ROOT / "configs" / "embeddings.yaml"
 
@@ -121,9 +113,7 @@ class FrozenV3Config:
         """Reject any runtime drift from the frozen winner."""
 
         if self.selected_variant != EXPECTED_SELECTED_VARIANT:
-            raise RAGConfigurationError(
-                "dev_best_v3 ne sélectionne pas lexical_safeguard_001."
-            )
+            raise RAGConfigurationError("dev_best_v3 ne sélectionne pas lexical_safeguard_001.")
 
         exact_parameters = {
             "candidate_k": (self.candidate_k, 20),
@@ -139,29 +129,19 @@ class FrozenV3Config:
 
         for name, (actual, expected) in exact_parameters.items():
             if actual != expected:
-                raise RAGConfigurationError(
-                    f"Paramètre figé inattendu {name}: {actual}."
-                )
+                raise RAGConfigurationError(f"Paramètre figé inattendu {name}: {actual}.")
 
         if self.query_expansion is not True:
-            raise RAGConfigurationError(
-                "L'expansion de requête figée doit être activée."
-            )
+            raise RAGConfigurationError("L'expansion de requête figée doit être activée.")
 
         if self.lexical_source != "bm25":
-            raise RAGConfigurationError(
-                "La source lexicale figée doit être BM25."
-            )
+            raise RAGConfigurationError("La source lexicale figée doit être BM25.")
 
         if self.duplicate_policy != "skip":
-            raise RAGConfigurationError(
-                "La politique figée doit ignorer les doublons."
-            )
+            raise RAGConfigurationError("La politique figée doit ignorer les doublons.")
 
         if self.fallback != "next_reranker_result":
-            raise RAGConfigurationError(
-                "Le fallback figé doit utiliser le prochain résultat."
-            )
+            raise RAGConfigurationError("Le fallback figé doit utiliser le prochain résultat.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,10 +162,7 @@ class ConversationRuntimeConfig:
         if self.recent_turns <= 0:
             raise ValueError("recent_turns doit être positif.")
 
-        if (
-            self.summary_max_tokens + self.recent_history_max_tokens
-            > self.total_history_max_tokens
-        ):
+        if self.summary_max_tokens + self.recent_history_max_tokens > self.total_history_max_tokens:
             raise ValueError("Budgets de mémoire conversationnelle invalides.")
 
 
@@ -195,21 +172,13 @@ class GenerationRuntimeConfig:
 
     max_context_tokens_per_source: int = 350
     max_total_document_context_tokens: int = 1750
-    maximum_answer_words: int = 100
 
     def __post_init__(self) -> None:
         if self.max_context_tokens_per_source <= 0:
-            raise ValueError(
-                "max_context_tokens_per_source doit être positif."
-            )
+            raise ValueError("max_context_tokens_per_source doit être positif.")
 
         if self.max_total_document_context_tokens < 5:
-            raise ValueError(
-                "max_total_document_context_tokens est insuffisant."
-            )
-
-        if self.maximum_answer_words <= 0:
-            raise ValueError("maximum_answer_words doit être positif.")
+            raise ValueError("max_total_document_context_tokens est insuffisant.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,34 +192,14 @@ class WarmupRuntimeConfig:
 
 
 def _default_source_policy_config() -> SourcePolicyConfig:
-    """Return eight-document defaults for legacy/rollback indexes."""
+    """Return a neutral source policy: automatic retrieval is global."""
 
-    sources = (
-        "01_becker_phosphates_and_phosphoric_acid.pdf",
-        "02_chemical_engineering_thermodynamics_9e.pdf",
-        "03_fundamentals_heat_mass_transfer.pdf",
-        "04_rapport_atelier_acide_phosphorique.pdf",
-        "05_perrys_chemical_engineers_handbook_9e.pdf",
-        "06_mullin_crystallization_4e.pdf",
-        "07_process_dynamics_control_seborg_4e.pdf",
-        "08_transport_phenomena_bird_2e.pdf",
-    )
     return SourcePolicyConfig(
         enabled=False,
-        default_priority=sources,
-        domain_routes={
-            "general": (sources[4], sources[0]),
-            "phosphoric_acid": (sources[0], sources[3], sources[4]),
-            "plant_specific": (sources[3], sources[0], sources[4]),
-            "thermodynamics": (sources[1], sources[4], sources[3]),
-            "heat_transfer": (sources[2], sources[4], sources[3]),
-            "equipment": (sources[4], sources[0], sources[3]),
-            "crystallization": (sources[5], sources[0]),
-            "control": (sources[6], sources[3]),
-            "transport": (sources[7], sources[4]),
-        },
-        minimum_preferred_chunks=2,
-        allow_fallback=True,
+        default_priority=(),
+        domain_routes={},
+        minimum_preferred_chunks=1,
+        allow_fallback=False,
     )
 
 
@@ -271,14 +220,10 @@ class RAGRuntimeConfig:
 
     def __post_init__(self) -> None:
         if self.maximum_question_characters <= 0:
-            raise ValueError(
-                "maximum_question_characters doit être positif."
-            )
+            raise ValueError("maximum_question_characters doit être positif.")
 
         if self.source_excerpt_characters <= 0:
-            raise ValueError(
-                "source_excerpt_characters doit être positif."
-            )
+            raise ValueError("source_excerpt_characters doit être positif.")
 
 
 class _TimedTokenizerProxy:
@@ -337,9 +282,7 @@ def _required_mapping(
     value = raw.get(name)
 
     if not isinstance(value, dict):
-        raise RAGConfigurationError(
-            f"Section {name} absente ou invalide."
-        )
+        raise RAGConfigurationError(f"Section {name} absente ou invalide.")
 
     return value
 
@@ -352,9 +295,7 @@ def load_runtime_config(
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     if not isinstance(raw, dict):
-        raise RAGConfigurationError(
-            "Configuration RAG de production invalide."
-        )
+        raise RAGConfigurationError("Configuration RAG de production invalide.")
 
     response = _required_mapping(raw, "response")
     conversation = _required_mapping(raw, "conversation_memory")
@@ -369,86 +310,46 @@ def load_runtime_config(
         "exclude_logs",
     )
 
-    if not all(
-        conversation.get(field_name) is True
-        for field_name in excluded_memory_fields
-    ):
-        raise RAGConfigurationError(
-            "La mémoire doit exclure sources, scores, prompts et logs."
-        )
+    if not all(conversation.get(field_name) is True for field_name in excluded_memory_fields):
+        raise RAGConfigurationError("La mémoire doit exclure sources, scores, prompts et logs.")
 
     default_priority = source_policy.get("default_priority")
     domain_routes = source_policy.get("domain_routes")
 
     if (
         not isinstance(default_priority, list)
-        or not all(
-            isinstance(source, str) and source.strip()
-            for source in default_priority
-        )
+        or not all(isinstance(source, str) and source.strip() for source in default_priority)
         or not isinstance(domain_routes, dict)
     ):
-        raise RAGConfigurationError(
-            "Configuration source_policy invalide."
-        )
+        raise RAGConfigurationError("Configuration source_policy invalide.")
 
     parsed_routes: dict[str, tuple[str, ...]] = {}
 
     for route_name, route in domain_routes.items():
         if not isinstance(route_name, str) or not isinstance(route, dict):
-            raise RAGConfigurationError(
-                "Route documentaire invalide dans source_policy."
-            )
+            raise RAGConfigurationError("Route documentaire invalide dans source_policy.")
         preferred_sources = route.get("preferred_sources")
-        if (
-            not isinstance(preferred_sources, list)
-            or not all(
-                isinstance(source, str) and source.strip()
-                for source in preferred_sources
-            )
+        if not isinstance(preferred_sources, list) or not all(
+            isinstance(source, str) and source.strip() for source in preferred_sources
         ):
-            raise RAGConfigurationError(
-                f"Sources préférées invalides : {route_name}."
-            )
+            raise RAGConfigurationError(f"Sources préférées invalides : {route_name}.")
         parsed_routes[route_name] = tuple(preferred_sources)
-
-    if "general" not in parsed_routes:
-        raise RAGConfigurationError(
-            "Route documentaire absente : general."
-        )
 
     return RAGRuntimeConfig(
         ollama=load_ollama_config(path),
-        maximum_question_characters=int(
-            response["maximum_question_characters"]
-        ),
-        source_excerpt_characters=int(
-            response["source_excerpt_characters"]
-        ),
+        maximum_question_characters=int(response["maximum_question_characters"]),
+        source_excerpt_characters=int(response["source_excerpt_characters"]),
         conversation=ConversationRuntimeConfig(
             enabled=bool(conversation["enabled"]),
             strategy=str(conversation["strategy"]),
             recent_turns=int(conversation["recent_turns"]),
-            summary_max_tokens=int(
-                conversation["summary_max_tokens"]
-            ),
-            recent_history_max_tokens=int(
-                conversation["recent_history_max_tokens"]
-            ),
-            total_history_max_tokens=int(
-                conversation["total_history_max_tokens"]
-            ),
+            summary_max_tokens=int(conversation["summary_max_tokens"]),
+            recent_history_max_tokens=int(conversation["recent_history_max_tokens"]),
+            total_history_max_tokens=int(conversation["total_history_max_tokens"]),
         ),
         generation=GenerationRuntimeConfig(
-            max_context_tokens_per_source=int(
-                generation["max_context_tokens_per_source"]
-            ),
-            max_total_document_context_tokens=int(
-                generation["max_total_document_context_tokens"]
-            ),
-            maximum_answer_words=int(
-                generation.get("maximum_answer_words", 100)
-            ),
+            max_context_tokens_per_source=int(generation["max_context_tokens_per_source"]),
+            max_total_document_context_tokens=int(generation["max_total_document_context_tokens"]),
         ),
         warmup=WarmupRuntimeConfig(
             enabled=bool(warmup["enabled"]),
@@ -460,9 +361,7 @@ def load_runtime_config(
             enabled=bool(source_policy["enabled"]),
             default_priority=tuple(default_priority),
             domain_routes=parsed_routes,
-            minimum_preferred_chunks=int(
-                source_policy["minimum_preferred_chunks"]
-            ),
+            minimum_preferred_chunks=int(source_policy["minimum_preferred_chunks"]),
             allow_fallback=bool(source_policy["allow_fallback"]),
         ),
         logging_level=str(logging_config.get("level", "INFO")),
@@ -496,36 +395,26 @@ def load_frozen_v3_config(
         reranking_path,
     ):
         if not required_path.is_file():
-            raise RAGConfigurationError(
-                f"Composant dev_best_v3 introuvable: {required_path}"
-            )
+            raise RAGConfigurationError(f"Composant dev_best_v3 introuvable: {required_path}")
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    safeguard = yaml.safe_load(
-        safeguard_path.read_text(encoding="utf-8")
-    )
+    safeguard = yaml.safe_load(safeguard_path.read_text(encoding="utf-8"))
 
     if not isinstance(manifest, dict) or not isinstance(safeguard, dict):
-        raise RAGConfigurationError(
-            "Le snapshot dev_best_v3 est invalide."
-        )
+        raise RAGConfigurationError("Le snapshot dev_best_v3 est invalide.")
 
     if (
         manifest.get("status") != "frozen_dev_best_v3"
         or manifest.get("scope") != "dev_only"
         or manifest.get("single_selected_variant") is not True
     ):
-        raise RAGConfigurationError(
-            "Le manifeste dev_best_v3 ne respecte pas le gel DEV."
-        )
+        raise RAGConfigurationError("Le manifeste dev_best_v3 ne respecte pas le gel DEV.")
 
     selection = safeguard.get("selection")
     retrieval = safeguard.get("retrieval")
 
     if not isinstance(selection, dict) or not isinstance(retrieval, dict):
-        raise RAGConfigurationError(
-            "Configuration safeguard figée invalide."
-        )
+        raise RAGConfigurationError("Configuration safeguard figée invalide.")
 
     if verify_integrity or verify_runtime_sources:
         _verify_snapshot_components(
@@ -544,15 +433,115 @@ def load_frozen_v3_config(
         query_expansion=bool(retrieval["query_expansion"]),
         top_k=int(selection["top_k"]),
         lexical_slots=int(selection["lexical_slots"]),
-        reranker_leading_slots=int(
-            selection["reranker_leading_slots"]
-        ),
+        reranker_leading_slots=int(selection["reranker_leading_slots"]),
         lexical_source=str(selection["lexical_source"]),
         duplicate_policy=str(selection["duplicate_policy"]),
         fallback=str(selection["fallback"]),
         retrieval_config_path=retrieval_path,
         reranking_config_path=reranking_path,
     )
+
+
+def load_rag_v1_retrieval_config(
+    config_path: Path = DEFAULT_RAG_V1_CONFIG_PATH,
+    *,
+    verify_integrity: bool = True,
+) -> FrozenV3Config:
+    """Load the production retrieval freeze without reading evaluation paths."""
+
+    config_path = config_path.resolve()
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or str(payload.get("rag_version")) != "1.0.0":
+        raise RAGConfigurationError("La configuration RAG v1 est invalide.")
+
+    retrieval = payload.get("retrieval")
+    reranker = payload.get("reranker")
+    if not isinstance(retrieval, dict) or not isinstance(reranker, dict):
+        raise RAGConfigurationError("Le gel retrieval/reranker RAG v1 est incomplet.")
+
+    def project_file(raw_value: Any, field_name: str) -> Path:
+        candidate = (PROJECT_ROOT / str(raw_value)).resolve()
+        if not candidate.is_relative_to(PROJECT_ROOT) or not candidate.is_file():
+            raise RAGConfigurationError(
+                f"Chemin RAG v1 invalide pour {field_name}: {raw_value}"
+            )
+        return candidate
+
+    retrieval_path = project_file(retrieval.get("config"), "retrieval.config")
+    safeguard_path = project_file(
+        retrieval.get("safeguard_config"),
+        "retrieval.safeguard_config",
+    )
+    reranking_path = project_file(reranker.get("config"), "reranker.config")
+
+    if verify_integrity:
+        expected_hashes = (
+            (retrieval_path, retrieval.get("config_sha256")),
+            (safeguard_path, retrieval.get("safeguard_sha256")),
+            (reranking_path, reranker.get("config_sha256")),
+        )
+        for path, expected in expected_hashes:
+            if not isinstance(expected, str) or sha256_file(path).lower() != expected.lower():
+                raise RAGConfigurationError(
+                    f"Empreinte de configuration RAG v1 incorrecte: {path.name}."
+                )
+
+    return FrozenV3Config(
+        snapshot_directory=config_path.parent,
+        snapshot_sha256=str(retrieval["historical_snapshot_sha256"]),
+        selected_variant=str(retrieval["selected_variant"]),
+        candidate_k=int(retrieval["candidate_k"]),
+        dense_candidates=int(retrieval["dense_candidates"]),
+        bm25_candidates=int(retrieval["bm25_candidates"]),
+        query_expansion=bool(retrieval["query_expansion"]),
+        top_k=int(retrieval["top_k"]),
+        lexical_slots=int(retrieval["lexical_slots"]),
+        reranker_leading_slots=int(retrieval["reranker_leading_slots"]),
+        lexical_source=str(retrieval["lexical_source"]),
+        duplicate_policy=str(retrieval["duplicate_policy"]),
+        fallback=str(retrieval["fallback"]),
+        retrieval_config_path=retrieval_path,
+        reranking_config_path=reranking_path,
+    )
+
+
+def load_rag_v1_runtime_config(
+    config_path: Path = DEFAULT_RAG_V1_CONFIG_PATH,
+) -> RAGRuntimeConfig:
+    """Load and cross-check the generation runtime named by the RAG v1 freeze."""
+
+    config_path = config_path.resolve()
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or str(payload.get("rag_version")) != "1.0.0":
+        raise RAGConfigurationError("La configuration RAG v1 est invalide.")
+
+    runtime_section = payload.get("runtime")
+    generation = payload.get("generation")
+    if not isinstance(runtime_section, dict) or not isinstance(generation, dict):
+        raise RAGConfigurationError("Le gel de génération RAG v1 est incomplet.")
+
+    runtime_path = (PROJECT_ROOT / str(runtime_section.get("config"))).resolve()
+    if not runtime_path.is_relative_to(PROJECT_ROOT) or not runtime_path.is_file():
+        raise RAGConfigurationError("Le chemin runtime RAG v1 est invalide.")
+    runtime = load_runtime_config(runtime_path)
+    expected = {
+        "model": runtime.ollama.model,
+        "temperature": runtime.ollama.temperature,
+        "seed": runtime.ollama.seed,
+        "context_size": runtime.ollama.context_size,
+        "max_output_tokens": runtime.ollama.max_output_tokens,
+        "keep_alive": runtime.ollama.keep_alive,
+    }
+    drift = {
+        key: {"freeze": generation.get(key), "runtime": value}
+        for key, value in expected.items()
+        if generation.get(key) != value
+    }
+    if drift:
+        raise RAGConfigurationError(
+            f"Dérive entre rag_v1.yaml et le runtime de génération: {drift}"
+        )
+    return runtime
 
 
 def _verify_snapshot_components(
@@ -566,9 +555,7 @@ def _verify_snapshot_components(
     components = manifest.get("components")
 
     if not isinstance(components, list):
-        raise RAGConfigurationError(
-            "Liste des composants absente du manifeste."
-        )
+        raise RAGConfigurationError("Liste des composants absente du manifeste.")
 
     records = {
         str(record["file"]): record
@@ -589,47 +576,23 @@ def _verify_snapshot_components(
         frozen_path = snapshot_directory / file_name
 
         if record is None or not frozen_path.is_file():
-            raise RAGConfigurationError(
-                f"Composant figé manquant: {file_name}."
-            )
+            raise RAGConfigurationError(f"Composant figé manquant: {file_name}.")
 
         if sha256_file(frozen_path) != record["frozen_sha256"]:
-            raise RAGConfigurationError(
-                f"Empreinte figée incorrecte: {file_name}."
-            )
+            raise RAGConfigurationError(f"Empreinte figée incorrecte: {file_name}.")
 
     if not verify_runtime_sources:
         return
 
     active_sources = {
-        "hybrid.py": (
-            PROJECT_ROOT
-            / "src"
-            / "phosprocess"
-            / "retrieval"
-            / "hybrid.py"
-        ),
-        "reranker.py": (
-            PROJECT_ROOT
-            / "src"
-            / "phosprocess"
-            / "reranking"
-            / "reranker.py"
-        ),
-        "v3_selection.py": (
-            PROJECT_ROOT
-            / "src"
-            / "phosprocess"
-            / "retrieval"
-            / "v3_selection.py"
-        ),
+        "hybrid.py": (PROJECT_ROOT / "src" / "phosprocess" / "retrieval" / "hybrid.py"),
+        "reranker.py": (PROJECT_ROOT / "src" / "phosprocess" / "reranking" / "reranker.py"),
+        "v3_selection.py": (PROJECT_ROOT / "src" / "phosprocess" / "retrieval" / "v3_selection.py"),
     }
 
     for file_name, active_path in active_sources.items():
         if sha256_file(active_path) != records[file_name]["source_sha256"]:
-            raise RAGConfigurationError(
-                f"Le code runtime diffère de dev_best_v3: {file_name}."
-            )
+            raise RAGConfigurationError(f"Le code runtime diffère de dev_best_v3: {file_name}.")
 
 
 def validate_question(
@@ -643,9 +606,7 @@ def validate_question(
         raise TypeError("La question doit être une chaîne de caractères.")
 
     if "\x00" in question:
-        raise ValueError(
-            "La question contient un caractère nul interdit."
-        )
+        raise ValueError("La question contient un caractère nul interdit.")
 
     normalized = _WHITESPACE.sub(" ", question).strip()
 
@@ -653,14 +614,10 @@ def validate_question(
         raise ValueError("La question ne peut pas être vide.")
 
     if len(normalized) > maximum_characters:
-        raise ValueError(
-            "La question dépasse la longueur maximale autorisée."
-        )
+        raise ValueError("La question dépasse la longueur maximale autorisée.")
 
     if not any(character.isalnum() for character in normalized):
-        raise ValueError(
-            "La question doit contenir un caractère alphanumérique."
-        )
+        raise ValueError("La question doit contenir un caractère alphanumérique.")
 
     return normalized
 
@@ -681,10 +638,10 @@ class PhosProcessRAG(
         verify_snapshot: bool = True,
     ) -> None:
         loading_started = time.perf_counter()
-        self.frozen_config = frozen_config or load_frozen_v3_config(
+        self.frozen_config = frozen_config or load_rag_v1_retrieval_config(
             verify_integrity=verify_snapshot,
         )
-        self.runtime_config = runtime_config or load_runtime_config()
+        self.runtime_config = runtime_config or load_rag_v1_runtime_config()
         self._lifecycle_counts = {
             "pipeline": 1,
             "retriever": 0,
@@ -703,9 +660,7 @@ class PhosProcessRAG(
         self._lifecycle_counts["bm25_index"] = 1
 
         if reranker is None:
-            reranker_config = load_reranking_config(
-                self.frozen_config.reranking_config_path
-            )
+            reranker_config = load_reranking_config(self.frozen_config.reranking_config_path)
             reranker = BGEReranker(
                 replace(
                     reranker_config,
@@ -721,11 +676,8 @@ class PhosProcessRAG(
         self.llm = llm or OllamaLLM(self.runtime_config.ollama)
         self.quality_engine: QualityRetrievalEngine | None = None
 
-        if (
-            self.active_knowledge_base is not None
-            and QualityRetrievalEngine.is_quality_index(
-                self.active_knowledge_base.version_directory
-            )
+        if self.active_knowledge_base is not None and QualityRetrievalEngine.is_quality_index(
+            self.active_knowledge_base.version_directory
         ):
             self.quality_engine = QualityRetrievalEngine(
                 version_directory=self.active_knowledge_base.version_directory,
@@ -735,9 +687,7 @@ class PhosProcessRAG(
             )
 
         self._lifecycle_counts["ollama_client"] = 1
-        self.initial_loading_ms = (
-            time.perf_counter() - loading_started
-        ) * 1000.0
+        self.initial_loading_ms = (time.perf_counter() - loading_started) * 1000.0
         self._turn_counter = 0
         self._active_metrics: RAGLatencyMetrics | None = None
         self._embedding_hook_installed = False
@@ -752,12 +702,8 @@ class PhosProcessRAG(
         self.active_knowledge_base = load_active_knowledge_base()
 
         return HybridRetriever(
-            dense_index_directory=(
-                self.active_knowledge_base.dense_index_directory
-            ),
-            bm25_index_directory=(
-                self.active_knowledge_base.bm25_index_directory
-            ),
+            dense_index_directory=(self.active_knowledge_base.dense_index_directory),
+            bm25_index_directory=(self.active_knowledge_base.bm25_index_directory),
             embedding_config_path=DEFAULT_EMBEDDING_CONFIG_PATH,
             retrieval_config_path=self.frozen_config.retrieval_config_path,
         )
@@ -774,10 +720,7 @@ class PhosProcessRAG(
             "version": active.version,
             "document_count": active.document_count,
             "chunk_count": active.chunk_count,
-            "documents": [
-                dict(document)
-                for document in active.documents
-            ],
+            "documents": [dict(document) for document in active.documents],
         }
 
     def _install_embedding_timer(self) -> None:
@@ -819,14 +762,10 @@ class PhosProcessRAG(
                 "bm25_retriever": id(bm25),
                 "reranker": id(self.reranker),
                 "ollama_client": id(self.llm),
-                "ollama_http_client": id(
-                    getattr(self.llm, "stream_http_client", None)
-                ),
+                "ollama_http_client": id(getattr(self.llm, "stream_http_client", None)),
             },
             "embedding_hook_installed": self._embedding_hook_installed,
-            "reranker_tokenizer_hook_installed": (
-                self._reranker_tokenizer_hook_installed
-            ),
+            "reranker_tokenizer_hook_installed": (self._reranker_tokenizer_hook_installed),
             "initial_loading_ms": self.initial_loading_ms,
         }
 
@@ -870,18 +809,12 @@ class PhosProcessRAG(
             if embedder is not None:
                 started = time.perf_counter()
                 embedder.embed_query("procédé phosphorique")
-                metrics.embedding_ms = (
-                    time.perf_counter() - started
-                ) * 1000.0
+                metrics.embedding_ms = (time.perf_counter() - started) * 1000.0
 
         if config.reranker and hasattr(self.reranker, "_compute_scores"):
             started = time.perf_counter()
-            self.reranker._compute_scores(
-                pairs=[["procédé", "passage industriel"]]
-            )
-            metrics.reranker_ms = (
-                time.perf_counter() - started
-            ) * 1000.0
+            self.reranker._compute_scores(pairs=[["procédé", "passage industriel"]])
+            metrics.reranker_ms = (time.perf_counter() - started) * 1000.0
 
         if config.ollama and hasattr(self.llm, "stream_chat"):
             telemetry = OllamaCallMetrics(
@@ -903,14 +836,10 @@ class PhosProcessRAG(
                     telemetry=telemetry,
                 )
             )
-            metrics.ollama_ms = (
-                time.perf_counter() - started
-            ) * 1000.0
+            metrics.ollama_ms = (time.perf_counter() - started) * 1000.0
             metrics.ollama_call_count = 1
 
-        metrics.total_ms = (
-            time.perf_counter() - total_started
-        ) * 1000.0
+        metrics.total_ms = (time.perf_counter() - total_started) * 1000.0
         self._warmup_metrics = metrics
         return metrics
 
@@ -926,9 +855,7 @@ class PhosProcessRAG(
         started = time.perf_counter()
         normalized = validate_question(
             question,
-            maximum_characters=(
-                self.runtime_config.maximum_question_characters
-            ),
+            maximum_characters=(self.runtime_config.maximum_question_characters),
         )
         adaptive_decision = decide_request_path(
             normalized,
@@ -944,10 +871,9 @@ class PhosProcessRAG(
 
         effective_source_mode = source_mode
         if self.quality_engine is not None:
-            effective_source_mode = (
-                detect_explicit_source_mode(normalized)
-                or self._quality_source_mode(source_mode)
-            )
+            effective_source_mode = detect_explicit_source_mode(
+                normalized
+            ) or self._quality_source_mode(source_mode)
 
         retrieved = self._retrieve_with_source_policy(
             normalized,
@@ -955,7 +881,6 @@ class PhosProcessRAG(
             source_mode=effective_source_mode,
         )
         system_prompt = SYSTEM_PROMPT
-        repair_system_prompt = REPAIR_SYSTEM_PROMPT
 
         if retrieved.quality_result is not None:
             classification = classify_question(normalized)
@@ -972,12 +897,6 @@ class PhosProcessRAG(
                 classification=classification,
                 json_output=True,
             )
-            repair_system_prompt = (
-                REPAIR_SYSTEM_PROMPT
-                + "\nPreserve the existing answer language: "
-                + language.language.prompt_name
-                + "."
-            )
         else:
             prepared = self._prepare_context(
                 retrieved.source_texts,
@@ -988,40 +907,15 @@ class PhosProcessRAG(
                 retrieved.sources,
                 prepared.texts,
                 json_output=True,
-                maximum_answer_words=(
-                    self.runtime_config.generation.maximum_answer_words
-                ),
             )
 
         generation_started = time.perf_counter()
         payload, citations, insufficient = self._generate_json_answer(
             user_prompt=package.user_prompt,
             system_prompt=system_prompt,
-            repair_system_prompt=repair_system_prompt,
             available_source_count=len(retrieved.sources),
-            evidence_bundles=(
-                retrieved.quality_result.bundles
-                if retrieved.quality_result is not None
-                else None
-            ),
-            question_type=retrieved.question_type,
-            response_language=retrieved.response_language,
-            comparison_subjects=self._comparison_subjects(
-                retrieved.quality_result
-            ),
-            contract_question=normalized,
-            balance_kind=(
-                retrieved.quality_result.retrieval_plan.balance_kind
-                if (
-                    retrieved.quality_result is not None
-                    and retrieved.quality_result.retrieval_plan is not None
-                )
-                else None
-            ),
         )
-        generation_ms = (
-            time.perf_counter() - generation_started
-        ) * 1000.0
+        generation_ms = (time.perf_counter() - generation_started) * 1000.0
         total_ms = (time.perf_counter() - started) * 1000.0
         return self._build_response(
             question=normalized,
@@ -1040,11 +934,7 @@ class PhosProcessRAG(
     def stream_answer(
         self,
         question: str,
-        history: (
-            list[ChatMessage]
-            | ConversationHistoryContext
-            | None
-        ) = None,
+        history: (list[ChatMessage] | ConversationHistoryContext | None) = None,
         *,
         source_mode: str = "automatic",
         language_mode: str = "auto",
@@ -1053,51 +943,33 @@ class PhosProcessRAG(
 
         turn_started = time.perf_counter()
         self._turn_counter += 1
-        metrics = RAGLatencyMetrics(
-            question_id=f"session-{self._turn_counter:04d}"
-        )
+        metrics = RAGLatencyMetrics(question_id=f"session-{self._turn_counter:04d}")
 
         try:
             phase_started = time.perf_counter()
             normalized = validate_question(
                 question,
-                maximum_characters=(
-                    self.runtime_config.maximum_question_characters
-                ),
+                maximum_characters=(self.runtime_config.maximum_question_characters),
             )
-            metrics.question_validation_ms = (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.question_validation_ms = (time.perf_counter() - phase_started) * 1000.0
 
             phase_started = time.perf_counter()
             memory_context = self._coerce_memory_context(history)
-            metrics.memory_build_ms = (
-                time.perf_counter() - phase_started
-            ) * 1000.0
-            metrics.history_turn_count = len(
-                memory_context.recent_turns
-            )
-            metrics.summary_token_count = (
-                memory_context.summary_token_count
-            )
-            metrics.recent_history_token_count = (
-                memory_context.recent_history_token_count
-            )
+            metrics.memory_build_ms = (time.perf_counter() - phase_started) * 1000.0
+            metrics.history_turn_count = len(memory_context.recent_turns)
+            metrics.summary_token_count = memory_context.summary_token_count
+            metrics.recent_history_token_count = memory_context.recent_history_token_count
             history_messages = memory_context.messages()
 
             phase_started = time.perf_counter()
-            business_state = (
-                memory_context.business_state or ConversationState()
-            )
+            business_state = memory_context.business_state or ConversationState()
             adaptive_decision = decide_request_path(
                 normalized,
                 source_mode=source_mode,
             )
 
             if adaptive_decision.path is RequestPath.DIRECT_LLM:
-                metrics.followup_detection_ms = (
-                    time.perf_counter() - phase_started
-                ) * 1000.0
+                metrics.followup_detection_ms = (time.perf_counter() - phase_started) * 1000.0
                 metrics.reformulation_method = "adaptive_router"
                 yield from self._stream_direct_request(
                     normalized,
@@ -1110,16 +982,20 @@ class PhosProcessRAG(
                 return
 
             if self.quality_engine is not None:
-                quality_resolution = resolve_standalone_query(
+                quality_resolution = resolve_ambiguous_query_with_llm(
                     normalized,
                     state=business_state,
+                    llm=self.llm,
                 )
                 retrieval_query = quality_resolution.standalone_query
                 follow_up = quality_resolution.followup_detected
-                reformulated = (
-                    quality_resolution.standalone_query != normalized
-                )
+                reformulated = quality_resolution.standalone_query != normalized
                 reformulation_method = quality_resolution.resolver_type
+                metrics.resolver_llm_ms = quality_resolution.resolver_latency_ms
+                metrics.resolver_llm_call_count = (
+                    quality_resolution.resolver_llm_call_count
+                )
+                metrics.ollama_call_count += quality_resolution.resolver_llm_call_count
             else:
                 resolution = resolve_follow_up(
                     normalized,
@@ -1131,9 +1007,7 @@ class PhosProcessRAG(
                 reformulated = resolution.reformulated
                 reformulation_method = resolution.method
 
-            detection_elapsed = (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            detection_elapsed = (time.perf_counter() - phase_started) * 1000.0
             metrics.followup_detection_ms = detection_elapsed
             metrics.reformulation_attempted = reformulated
             metrics.reformulation_method = reformulation_method
@@ -1164,32 +1038,24 @@ class PhosProcessRAG(
                 mode=language_mode,
             )
             classification = classify_question(retrieval_query)
-            business_state.record_question_type(
-                classification.question_type.value
-            )
+            business_state.record_question_type(classification.question_type.value)
 
             if self.quality_engine is not None:
                 routing_preview = route_query(
                     retrieval_query,
                     catalog=self.quality_engine.catalog,
-                    source_mode=self._quality_source_mode(
-                        effective_source_mode
-                    ),
+                    source_mode=self._quality_source_mode(effective_source_mode),
                     question_type=classification.question_type.value,
                     focus_entity=business_state.focus_entity,
                 )
                 route_label = ",".join(
-                    domain.value
-                    for domain, _confidence in (
-                        routing_preview.detected_domains
-                    )
+                    domain.value for domain, _confidence in (routing_preview.detected_domains)
                 )
                 primary_label = (
                     next(
                         entry.display_title
                         for entry in self.quality_engine.catalog.documents
-                        if entry.document_id
-                        == routing_preview.preferred_documents[0]
+                        if entry.document_id == routing_preview.preferred_documents[0]
                     )
                     if routing_preview.preferred_documents
                     else "Aucune"
@@ -1230,19 +1096,11 @@ class PhosProcessRAG(
                 metadata={
                     "candidate_count": len(retrieved.candidates),
                     "selected_count": len(retrieved.selected),
-                    "hybrid_ms": float(
-                        retrieved.hybrid_response.total_duration_ms
-                    ),
+                    "hybrid_ms": float(retrieved.hybrid_response.total_duration_ms),
                     "reranking_ms": metrics.reranking_ms,
-                    "source_policy_route": (
-                        metrics.source_policy_route
-                    ),
-                    "source_policy_primary": (
-                        metrics.source_policy_primary
-                    ),
-                    "source_policy_fallback_used": (
-                        metrics.source_policy_fallback_used
-                    ),
+                    "source_policy_route": (metrics.source_policy_route),
+                    "source_policy_primary": (metrics.source_policy_primary),
+                    "source_policy_fallback_used": (metrics.source_policy_fallback_used),
                     "query_expansion": (
                         list(retrieved.quality_result.query.added_terms)
                         if retrieved.quality_result is not None
@@ -1289,14 +1147,10 @@ class PhosProcessRAG(
                     retrieval_query,
                 )
 
-            metrics.excerpt_preparation_ms = (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.excerpt_preparation_ms = (time.perf_counter() - phase_started) * 1000.0
 
             if prepared is not None:
-                metrics.document_context_token_count = (
-                    prepared.total_tokens
-                )
+                metrics.document_context_token_count = prepared.total_tokens
 
             phase_started = time.perf_counter()
 
@@ -1320,14 +1174,9 @@ class PhosProcessRAG(
                     prepared.texts,
                     memory=memory_context,
                     json_output=False,
-                    maximum_answer_words=(
-                        self.runtime_config.generation.maximum_answer_words
-                    ),
                 )
 
-            metrics.prompt_build_ms = (
-                time.perf_counter() - phase_started
-            ) * 1000.0
+            metrics.prompt_build_ms = (time.perf_counter() - phase_started) * 1000.0
             self._record_prompt_metrics(
                 metrics,
                 package,
@@ -1347,318 +1196,98 @@ class PhosProcessRAG(
             ]
             generation_started = time.perf_counter()
             first_turn_token_ms: float | None = None
-            repair_started: float | None = None
-            quality_bundles = (
-                retrieved.quality_result.bundles
-                if retrieved.quality_result is not None
-                else None
+            fragments: list[str] = []
+            call = OllamaCallMetrics(
+                call_type="generation_main",
+                model=self.runtime_config.ollama.model,
+                streaming=True,
             )
-            comparison_subjects = self._comparison_subjects(
-                retrieved.quality_result
+
+            try:
+                for fragment in self.llm.stream_chat(
+                    messages,
+                    call_type=call.call_type,
+                    telemetry=call,
+                ):
+                    if first_turn_token_ms is None and fragment.strip():
+                        first_turn_token_ms = (time.perf_counter() - turn_started) * 1000.0
+                        metrics.turn_time_to_first_token_ms = first_turn_token_ms
+                    fragments.append(fragment)
+            finally:
+                metrics.absorb_ollama_call(call)
+
+            answer = "".join(fragments).strip()
+            yield RAGStreamEvent(
+                event_type="validation_started",
+                metadata={"attempt": "initial"},
             )
-            balance_kind = (
-                retrieved.quality_result.retrieval_plan.balance_kind
-                if (
-                    retrieved.quality_result is not None
-                    and retrieved.quality_result.retrieval_plan is not None
+
+            try:
+                answer, metrics.truncation_salvaged = self._finalize_likely_truncation(
+                    answer,
+                    generated_token_count=call.generated_token_count,
+                    response_language=language.language.value,
                 )
-                else None
-            )
-            buffer_until_validated = quality_bundles is not None
-            deterministic_pruning_applied = False
-
-            for attempt_index, attempt in enumerate(
-                ("initial", "repair")
-            ):
-                fragments: list[str] = []
-                call = OllamaCallMetrics(
-                    call_type=(
-                        "generation_main"
-                        if attempt == "initial"
-                        else "citation_repair"
-                    ),
-                    model=self.runtime_config.ollama.model,
-                    streaming=True,
-                )
-
-                try:
-                    for fragment in self.llm.stream_chat(
-                        messages,
-                        call_type=call.call_type,
-                        telemetry=call,
-                    ):
-                        if (
-                            first_turn_token_ms is None
-                            and fragment.strip()
-                        ):
-                            first_turn_token_ms = (
-                                time.perf_counter() - turn_started
-                            ) * 1000.0
-                            metrics.turn_time_to_first_token_ms = (
-                                first_turn_token_ms
-                            )
-
-                        fragments.append(fragment)
-
-                        if not buffer_until_validated:
-                            yield RAGStreamEvent(
-                                event_type="token",
-                                content=fragment,
-                                metadata={"attempt": attempt},
-                            )
-                finally:
-                    metrics.absorb_ollama_call(call)
-
-                answer = "".join(fragments).strip()
-                yield RAGStreamEvent(
-                    event_type="validation_started",
-                    metadata={"attempt": attempt},
-                )
-
-                try:
-                    self._reject_likely_truncation(
-                        answer,
-                        generated_token_count=(
-                            call.generated_token_count
-                        ),
-                    )
-                    citations, insufficient = (
-                        self._validate_answer_with_metrics(
-                            answer=answer,
-                            available_source_count=len(
-                                retrieved.sources
-                            ),
-                            attempt=attempt,
-                            metrics=metrics,
-                            evidence_bundles=quality_bundles,
-                        )
-                    )
-                except CitationValidationError as error:
-                    self._log_validation_rejection(
-                        attempt=attempt,
-                        error=error,
-                        available_source_count=len(
-                            retrieved.sources
-                        ),
-                        raw_output=answer,
-                        final=attempt_index == 1,
-                    )
-
-                    if quality_bundles is not None and attempt == "initial":
-                        pruned = prune_unsupported_claims(
-                            answer,
-                            list(quality_bundles),
-                            fallback_language=language.language.value,
-                            question_type=classification.question_type.value,
-                        )
-                        answer = pruned.answer
-                        deterministic_pruning_applied = True
-
-                        LOGGER.info(
-                            "RAG deterministic pruning removed_claims=%d "
-                            "inherited_citations=%d fallback=%s "
-                            "missing_required=%s atomic_plan=%s "
-                            "reconstructed_claims=%d",
-                            len(pruned.removed_claims),
-                            pruned.inherited_citation_count,
-                            pruned.fallback_used,
-                            pruned.missing_required_concepts,
-                            pruned.atomic_plan_used,
-                            pruned.reconstructed_claim_count,
-                        )
-
-                        if pruned.fallback_used:
-                            citations = []
-                            insufficient = True
-                        else:
-                            try:
-                                citations, insufficient = (
-                                    self._validate_answer_with_metrics(
-                                        answer=answer,
-                                        available_source_count=len(
-                                            retrieved.sources
-                                        ),
-                                        attempt="deterministic_pruning",
-                                        metrics=metrics,
-                                        evidence_bundles=quality_bundles,
-                                    )
-                                )
-                            except CitationValidationError as pruning_error:
-                                LOGGER.warning(
-                                    "RAG deterministic pruning fallback "
-                                    "reason=%s",
-                                    pruning_error,
-                                )
-                                answer = (
-                                    "The corpus does not provide enough "
-                                    "explicit evidence to answer reliably."
-                                    if language.language.value.startswith("en")
-                                    else (
-                                        "Impossible a determiner a partir "
-                                        "du corpus documentaire : les "
-                                        "passages recuperes ne soutiennent "
-                                        "pas une reponse fiable."
-                                    )
-                                )
-                                citations = []
-                                insufficient = True
-                    else:
-                        if attempt_index == 1:
-                            if repair_started is not None:
-                                metrics.repair_ms = (
-                                    time.perf_counter() - repair_started
-                                ) * 1000.0
-
-                            metrics.total_ms = (
-                                time.perf_counter() - turn_started
-                            ) * 1000.0
-                            yield RAGStreamEvent(
-                                event_type="error",
-                                content=(
-                                    "Réponse invalide après une réparation : "
-                                    f"{error}"
-                                ),
-                                metadata={"latency": metrics.to_dict()},
-                            )
-                            return
-
-                        metrics.repair_attempted = True
-                        metrics.repair_reason = str(error)
-                        repair_started = time.perf_counter()
-                        repair_prompt = build_repair_prompt(
-                            original_prompt=package.user_prompt,
-                            invalid_output=answer,
-                            rejection_reason=str(error),
-                            json_output=False,
-                        )
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": (
-                                    REPAIR_SYSTEM_PROMPT
-                                    + "\nPreserve the existing answer language: "
-                                    + language.language.prompt_name
-                                    + "."
-                                ),
-                            },
-                            {
-                                "role": "user",
-                                "content": repair_prompt,
-                            },
-                        ]
-                        continue
-
-                if quality_bundles is not None:
-                    contract = enforce_answer_contract(
-                        answer,
-                        list(quality_bundles),
-                        question_type=classification.question_type.value,
-                        language=language.language.value,
-                        comparison_subjects=comparison_subjects,
-                        question=retrieval_query,
-                        balance_kind=balance_kind,
-                    )
-                    answer = contract.answer
-                    LOGGER.info(
-                        "RAG answer contract type=%s changed=%s fallback=%s "
-                        "missing_roles=%s removed_claims=%d atomic_plan=%s",
-                        classification.question_type.value,
-                        contract.changed,
-                        contract.fallback_used,
-                        contract.missing_roles,
-                        len(contract.removed_claims),
-                        contract.atomic_plan_used,
-                    )
-                    if contract.fallback_used:
-                        citations = []
-                        insufficient = True
-                    elif contract.changed or insufficient:
-                        try:
-                            citations, insufficient = (
-                                self._validate_answer_with_metrics(
-                                    answer=answer,
-                                    available_source_count=len(
-                                        retrieved.sources
-                                    ),
-                                    attempt="answer_contract",
-                                    metrics=metrics,
-                                    evidence_bundles=quality_bundles,
-                                )
-                            )
-                        except CitationValidationError as contract_error:
-                            LOGGER.warning(
-                                "RAG deterministic answer builder fallback "
-                                "reason=%s",
-                                contract_error,
-                            )
-                            answer = _controlled_fallback_for_language(
-                                language.language.value
-                            )
-                            citations = []
-                            insufficient = True
-
-                if repair_started is not None:
-                    metrics.repair_ms = (
-                        time.perf_counter() - repair_started
-                    ) * 1000.0
-
-                generation_ms = (
-                    time.perf_counter() - generation_started
-                ) * 1000.0
-                metrics.total_ms = (
-                    time.perf_counter() - turn_started
-                ) * 1000.0
-                metrics.citations = citations
-                cited_sources = self._cited_sources(
-                    retrieved.sources,
-                    citations,
-                )
-                metrics.displayed_source_count = len(cited_sources)
-                response = self._build_response(
-                    question=normalized,
+                citations, insufficient = self._validate_answer_with_metrics(
                     answer=answer,
-                    cited_sources=cited_sources,
-                    cited_source_numbers=citations,
-                    insufficient_context=insufficient,
-                    retrieved=retrieved,
-                    generation_ms=generation_ms,
-                    total_ms=metrics.total_ms,
-                    first_token_ms=first_turn_token_ms,
-                    latency=metrics,
+                    available_source_count=len(retrieved.sources),
+                    attempt="initial",
+                    metrics=metrics,
                 )
-                LOGGER.info(
-                    "RAG_LATENCY %s",
-                    metrics.concise_log_fields(),
+            except CitationValidationError as error:
+                self._log_validation_rejection(
+                    attempt="initial",
+                    error=error,
+                    available_source_count=len(retrieved.sources),
+                    raw_output=answer,
+                    final=True,
                 )
-                if buffer_until_validated:
-                    yield RAGStreamEvent(
-                        event_type="token",
-                        content=answer,
-                        metadata={
-                            "attempt": attempt,
-                            "deterministic_pruning": (
-                                deterministic_pruning_applied
-                            ),
-                            "response_validated": True,
-                        },
-                    )
+                metrics.total_ms = (time.perf_counter() - turn_started) * 1000.0
                 yield RAGStreamEvent(
-                    event_type="sources",
-                    sources=cited_sources,
-                    metadata={"citations": citations},
-                )
-                yield RAGStreamEvent(
-                    event_type="completed",
-                    response=response,
+                    event_type="error",
+                    content=f"Réponse invalide : {error}",
                     metadata={"latency": metrics.to_dict()},
                 )
                 return
+
+            generation_ms = (time.perf_counter() - generation_started) * 1000.0
+            metrics.total_ms = (time.perf_counter() - turn_started) * 1000.0
+            metrics.citations = citations
+            cited_sources = self._cited_sources(retrieved.sources, citations)
+            metrics.displayed_source_count = len(cited_sources)
+            response = self._build_response(
+                question=normalized,
+                answer=answer,
+                cited_sources=cited_sources,
+                cited_source_numbers=citations,
+                insufficient_context=insufficient,
+                retrieved=retrieved,
+                generation_ms=generation_ms,
+                total_ms=metrics.total_ms,
+                first_token_ms=first_turn_token_ms,
+                latency=metrics,
+            )
+            LOGGER.info("RAG_LATENCY %s", metrics.concise_log_fields())
+            yield RAGStreamEvent(
+                event_type="token",
+                content=answer,
+                metadata={"attempt": "initial", "response_validated": True},
+            )
+            yield RAGStreamEvent(
+                event_type="sources",
+                sources=cited_sources,
+                metadata={"citations": citations},
+            )
+            yield RAGStreamEvent(
+                event_type="completed",
+                response=response,
+                metadata={"latency": metrics.to_dict()},
+            )
+            return
         except KeyboardInterrupt:
             raise
         except (RAGError, OllamaError, ValueError, TypeError) as error:
-            metrics.total_ms = (
-                time.perf_counter() - turn_started
-            ) * 1000.0
+            metrics.total_ms = (time.perf_counter() - turn_started) * 1000.0
             LOGGER.error(
                 "Streaming RAG failed error_type=%s reason=%s",
                 type(error).__name__,
@@ -1670,9 +1299,7 @@ class PhosProcessRAG(
                 metadata={"latency": metrics.to_dict()},
             )
         except Exception as error:
-            metrics.total_ms = (
-                time.perf_counter() - turn_started
-            ) * 1000.0
+            metrics.total_ms = (time.perf_counter() - turn_started) * 1000.0
             LOGGER.exception("Unexpected streaming RAG failure")
             yield RAGStreamEvent(
                 event_type="error",
@@ -1687,11 +1314,7 @@ class PhosProcessRAG(
 
     def _coerce_memory_context(
         self,
-        history: (
-            list[ChatMessage]
-            | ConversationHistoryContext
-            | None
-        ),
+        history: (list[ChatMessage] | ConversationHistoryContext | None),
     ) -> ConversationHistoryContext:
         """Accept the new memory object while preserving list compatibility."""
 
@@ -1722,9 +1345,7 @@ class PhosProcessRAG(
             enabled=config.enabled if enabled is None else enabled,
             recent_turns=config.recent_turns,
             summary_max_tokens=config.summary_max_tokens,
-            recent_history_max_tokens=(
-                config.recent_history_max_tokens
-            ),
+            recent_history_max_tokens=(config.recent_history_max_tokens),
             total_history_max_tokens=config.total_history_max_tokens,
         )
 
@@ -1798,18 +1419,11 @@ class PhosProcessRAG(
             len(STREAMING_SYSTEM_PROMPT)
             + len(question)
             + sum(len(text) for text in retrieved.source_texts)
-            + sum(
-                len(message.content)
-                for message in memory.messages()
-            )
+            + sum(len(message.content) for message in memory.messages())
             + 500
         )
-        metrics.baseline_equivalent_prompt_characters = (
-            baseline_characters
-        )
-        metrics.baseline_equivalent_prompt_tokens = estimate_tokens(
-            "x" * baseline_characters
-        )
+        metrics.baseline_equivalent_prompt_characters = baseline_characters
+        metrics.baseline_equivalent_prompt_tokens = estimate_tokens("x" * baseline_characters)
 
     def close(self) -> None:
         """Release the persistent Ollama HTTP client."""

@@ -57,11 +57,7 @@ class ProcessedDocument:
                 "filename": self.filename,
                 "document_sha256": self.document_sha256,
                 "chunk_sha256": chunk_sha256(chunk),
-                "section": (
-                    " > ".join(chunk.heading_path)
-                    if chunk.heading_path
-                    else None
-                ),
+                "section": (" > ".join(chunk.heading_path) if chunk.heading_path else None),
                 "ingestion_date": self.ingestion_date,
                 "pipeline_version": KNOWLEDGE_BASE_PIPELINE_VERSION,
             }

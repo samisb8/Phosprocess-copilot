@@ -14,9 +14,7 @@ _FORMULA_HINT = re.compile(
     r"<!--\s*formula|(?:^|\s)[A-Za-zΑ-ω]\s*=|[∑∫√≈≤≥∆Δ]",
     flags=re.IGNORECASE,
 )
-_FIGURE_HINT = re.compile(
-    r"(?im)^\s*(?:figure|fig\.|diagram|schéma)\s+\d+"
-)
+_FIGURE_HINT = re.compile(r"(?im)^\s*(?:figure|fig\.|diagram|schéma)\s+\d+")
 
 
 class PageExtractionStatus(StrEnum):
@@ -95,9 +93,7 @@ class DocumentExtractionReport(BaseModel):
 def _control_character_ratio(text: str) -> float:
     visible = max(1, sum(not character.isspace() for character in text))
     controls = sum(
-        unicodedata.category(character) == "Cc"
-        and character not in "\n\r\t"
-        for character in text
+        unicodedata.category(character) == "Cc" and character not in "\n\r\t" for character in text
     )
     return controls / visible
 
@@ -128,14 +124,10 @@ def assess_page(
     control_ratio = _control_character_ratio(stripped)
     letter_ratio = letter_count / max(1, visible_count)
     formulas = (
-        len(_FORMULA_HINT.findall(markdown or stripped))
-        if formula_count is None
-        else formula_count
+        len(_FORMULA_HINT.findall(markdown or stripped)) if formula_count is None else formula_count
     )
     figures = (
-        len(_FIGURE_HINT.findall(markdown or stripped))
-        if figure_count is None
-        else figure_count
+        len(_FIGURE_HINT.findall(markdown or stripped)) if figure_count is None else figure_count
     )
     warnings: list[str] = []
 
@@ -151,10 +143,7 @@ def assess_page(
             status = PageExtractionStatus.LOW_TEXT
             warnings.append("empty_page")
     elif visible_count >= 200 and (
-        letter_ratio < 0.15
-        or replacement_ratio > 0.05
-        or control_ratio > 0.08
-        or word_count < 5
+        letter_ratio < 0.15 or replacement_ratio > 0.05 or control_ratio > 0.08 or word_count < 5
     ):
         status = PageExtractionStatus.CORRUPTED_TEXT
         warnings.append("unusable_character_distribution")
@@ -228,8 +217,7 @@ def build_extraction_report(
 
     total_characters = sum(page.character_count for page in pages)
     total_replacements = sum(
-        round(page.replacement_character_ratio * max(1, page.character_count))
-        for page in pages
+        round(page.replacement_character_ratio * max(1, page.character_count)) for page in pages
     )
 
     return DocumentExtractionReport(

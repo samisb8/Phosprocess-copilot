@@ -16,9 +16,7 @@ _MARKDOWN_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _MARKDOWN_IMAGE = re.compile(r"!\[([^\]]*)]\([^)]*\)")
 _IMAGE_COMMENT = re.compile(r"<!--\s*image\s*-->", flags=re.IGNORECASE)
 _TABLE_LINE = re.compile(r"^\s*\|.*\|\s*$")
-_SENTENCE_BOUNDARY = re.compile(
-    r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ0-9])"
-)
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ0-9])")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,11 +47,9 @@ class StructureAwareChunker:
     def __init__(self, config: ChunkingConfig) -> None:
         self.config = config
 
-        self.tokenizer: PreTrainedTokenizerBase = (
-            AutoTokenizer.from_pretrained(
-                config.tokenizer_name,
-                use_fast=True,
-            )
+        self.tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+            config.tokenizer_name,
+            use_fast=True,
         )
 
         # Réserve de la place pour le titre, la section et les pages.
@@ -137,9 +133,7 @@ class StructureAwareChunker:
 
             # Les tableaux extraits séparément sont conservés si le
             # Markdown principal ne les contient pas déjà.
-            existing_text = "\n".join(
-                unit.text for unit in page_units
-            )
+            existing_text = "\n".join(unit.text for unit in page_units)
 
             for table in page.content.tables:
                 table = table.strip()
@@ -181,11 +175,7 @@ class StructureAwareChunker:
             if not text:
                 return
 
-            kind: UnitKind = (
-                "caption"
-                if self._looks_like_caption(text)
-                else "paragraph"
-            )
+            kind: UnitKind = "caption" if self._looks_like_caption(text) else "paragraph"
 
             units.append(
                 TextUnit(
@@ -314,11 +304,7 @@ class StructureAwareChunker:
     def _join_paragraph_lines(lines: list[str]) -> str:
         """Réunir les lignes sans casser les listes Markdown."""
 
-        if any(
-            re.match(r"^[-*+]\s+", line)
-            or re.match(r"^\d+[.)]\s+", line)
-            for line in lines
-        ):
+        if any(re.match(r"^[-*+]\s+", line) or re.match(r"^\d+[.)]\s+", line) for line in lines):
             return "\n".join(lines).strip()
 
         return " ".join(lines).strip()
@@ -332,10 +318,7 @@ class StructureAwareChunker:
         groups: list[list[TextUnit]] = []
 
         for unit in units:
-            if (
-                not groups
-                or groups[-1][0].heading_path != unit.heading_path
-            ):
+            if not groups or groups[-1][0].heading_path != unit.heading_path:
                 groups.append([unit])
             else:
                 groups[-1].append(unit)
@@ -372,11 +355,7 @@ class StructureAwareChunker:
 
             candidate = [*current, unit]
 
-            if (
-                current
-                and self._count_unit_tokens(candidate)
-                > self.max_body_tokens
-            ):
+            if current and self._count_unit_tokens(candidate) > self.max_body_tokens:
                 chunks.append(current)
                 current = []
 
@@ -397,9 +376,7 @@ class StructureAwareChunker:
             return [unit]
 
         sentences = [
-            sentence.strip()
-            for sentence in _SENTENCE_BOUNDARY.split(unit.text)
-            if sentence.strip()
+            sentence.strip() for sentence in _SENTENCE_BOUNDARY.split(unit.text) if sentence.strip()
         ]
 
         if len(sentences) <= 1:
@@ -411,11 +388,7 @@ class StructureAwareChunker:
         for sentence in sentences:
             candidate = " ".join([*current_sentences, sentence])
 
-            if (
-                current_sentences
-                and self.count_tokens(candidate)
-                > self.max_body_tokens
-            ):
+            if current_sentences and self.count_tokens(candidate) > self.max_body_tokens:
                 pieces.append(
                     self._copy_unit(
                         unit,
@@ -425,11 +398,7 @@ class StructureAwareChunker:
                 current_sentences = []
 
             if self.count_tokens(sentence) > self.max_body_tokens:
-                pieces.extend(
-                    self._split_by_words(
-                        self._copy_unit(unit, sentence)
-                    )
-                )
+                pieces.extend(self._split_by_words(self._copy_unit(unit, sentence)))
             else:
                 current_sentences.append(sentence)
 
@@ -455,11 +424,7 @@ class StructureAwareChunker:
         for word in unit.text.split():
             candidate = " ".join([*current_words, word])
 
-            if (
-                current_words
-                and self.count_tokens(candidate)
-                > self.max_body_tokens
-            ):
+            if current_words and self.count_tokens(candidate) > self.max_body_tokens:
                 pieces.append(
                     self._copy_unit(
                         unit,
@@ -505,10 +470,7 @@ class StructureAwareChunker:
         for unit in reversed(units):
             candidate = [unit, *overlap]
 
-            if (
-                self._count_unit_tokens(candidate)
-                > self.config.overlap_tokens
-            ):
+            if self._count_unit_tokens(candidate) > self.config.overlap_tokens:
                 break
 
             overlap.insert(0, unit)
@@ -529,24 +491,14 @@ class StructureAwareChunker:
         for chunk in chunks:
             chunk_tokens = self._count_unit_tokens(chunk)
 
-            if (
-                merged
-                and chunk_tokens < self.config.min_chunk_tokens
-            ):
+            if merged and chunk_tokens < self.config.min_chunk_tokens:
                 previous = merged[-1]
 
-                unique_units = [
-                    unit
-                    for unit in chunk
-                    if unit not in previous
-                ]
+                unique_units = [unit for unit in chunk if unit not in previous]
 
                 candidate = [*previous, *unique_units]
 
-                if (
-                    self._count_unit_tokens(candidate)
-                    <= self.max_body_tokens
-                ):
+                if self._count_unit_tokens(candidate) <= self.max_body_tokens:
                     merged[-1] = candidate
                     continue
 
@@ -563,9 +515,7 @@ class StructureAwareChunker:
         if not units:
             return 0
 
-        return self.count_tokens(
-            "\n\n".join(unit.text for unit in units)
-        )
+        return self.count_tokens("\n\n".join(unit.text for unit in units))
 
     def _build_chunk(
         self,
@@ -579,9 +529,7 @@ class StructureAwareChunker:
 
         text = "\n\n".join(unit.text for unit in units).strip()
 
-        source_pages = sorted(
-            {unit.page_number for unit in units}
-        )
+        source_pages = sorted({unit.page_number for unit in units})
 
         heading_path = list(
             max(
@@ -591,9 +539,7 @@ class StructureAwareChunker:
             )
         )
 
-        content_types = sorted(
-            {unit.kind for unit in units}
-        )
+        content_types = sorted({unit.kind for unit in units})
 
         context_lines = [
             f"Document: {source_file}",
@@ -601,9 +547,7 @@ class StructureAwareChunker:
         ]
 
         if heading_path:
-            context_lines.append(
-                f"Section: {' > '.join(heading_path)}"
-            )
+            context_lines.append(f"Section: {' > '.join(heading_path)}")
 
         embedding_text = (
             "\n".join(context_lines) + "\n\n" + text
@@ -611,9 +555,7 @@ class StructureAwareChunker:
             else text
         )
 
-        digest_source = (
-            f"{document_id}|{chunk_index}|{text}"
-        ).encode()
+        digest_source = (f"{document_id}|{chunk_index}|{text}").encode()
 
         digest = hashlib.sha256(digest_source).hexdigest()[:12]
 

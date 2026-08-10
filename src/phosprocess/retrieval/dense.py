@@ -49,40 +49,23 @@ class DenseRetriever:
         embedding_config_path: Path,
     ) -> None:
         self.index_directory = index_directory.resolve()
-        self.embedding_config_path = (
-            embedding_config_path.resolve()
-        )
+        self.embedding_config_path = embedding_config_path.resolve()
 
-        self.index_path = (
-            self.index_directory / "index.faiss"
-        )
-        self.metadata_path = (
-            self.index_directory / "metadata.jsonl"
-        )
-        self.manifest_path = (
-            self.index_directory / "manifest.json"
-        )
+        self.index_path = self.index_directory / "index.faiss"
+        self.metadata_path = self.index_directory / "metadata.jsonl"
+        self.manifest_path = self.index_directory / "manifest.json"
 
         self._check_required_files()
 
-        self.index: Any = faiss.read_index(
-            str(self.index_path)
-        )
+        self.index: Any = faiss.read_index(str(self.index_path))
 
-        self.metadata = self._load_metadata(
-            self.metadata_path
-        )
+        self.metadata = self._load_metadata(self.metadata_path)
 
         self._validate_index_and_metadata()
 
-        embedding_config = load_embedding_config(
-            self.embedding_config_path
-        )
+        embedding_config = load_embedding_config(self.embedding_config_path)
 
-        if (
-            embedding_config.embedding_dimension
-            != int(self.index.d)
-        ):
+        if embedding_config.embedding_dimension != int(self.index.d):
             raise ValueError(
                 "La dimension du modèle d'embeddings ne "
                 "correspond pas à celle de l'index FAISS : "
@@ -118,31 +101,19 @@ class DenseRetriever:
         cleaned_query = query.strip()
 
         if not cleaned_query:
-            raise ValueError(
-                "La requête de recherche ne peut pas être vide."
-            )
+            raise ValueError("La requête de recherche ne peut pas être vide.")
 
         if top_k <= 0:
-            raise ValueError(
-                "top_k doit être strictement positif."
-            )
+            raise ValueError("top_k doit être strictement positif.")
 
         if minimum_score is not None and not -1 <= minimum_score <= 1:
-            raise ValueError(
-                "minimum_score doit être compris entre -1 et 1."
-            )
+            raise ValueError("minimum_score doit être compris entre -1 et 1.")
 
         normalized_chunk_ids = (
-            {chunk_id.strip() for chunk_id in chunk_ids if chunk_id.strip()}
-            if chunk_ids
-            else None
+            {chunk_id.strip() for chunk_id in chunk_ids if chunk_id.strip()} if chunk_ids else None
         )
         normalized_document_ids = (
-            {
-                document_id.strip()
-                for document_id in document_ids
-                if document_id.strip()
-            }
+            {document_id.strip() for document_id in document_ids if document_id.strip()}
             if document_ids
             else None
         )
@@ -158,9 +129,7 @@ class DenseRetriever:
 
         search_start = time.perf_counter()
 
-        query_vector = self.embedder.embed_query(
-            cleaned_query
-        )
+        query_vector = self.embedder.embed_query(cleaned_query)
 
         query_matrix = np.ascontiguousarray(
             query_vector.reshape(1, -1),
@@ -169,8 +138,7 @@ class DenseRetriever:
 
         if query_matrix.shape != (1, self.dimension):
             raise ValueError(
-                "Dimension inattendue pour l'embedding de "
-                f"requête : {query_matrix.shape}."
+                f"Dimension inattendue pour l'embedding de requête : {query_matrix.shape}."
             )
 
         scores, vector_ids = self.index.search(
@@ -193,19 +161,13 @@ class DenseRetriever:
 
             chunk = self.metadata[vector_id]
 
-            if (
-                normalized_document_ids
-                and chunk.document_id not in normalized_document_ids
-            ):
+            if normalized_document_ids and chunk.document_id not in normalized_document_ids:
                 continue
 
             if normalized_chunk_ids and chunk.chunk_id not in normalized_chunk_ids:
                 continue
 
-            if (
-                minimum_score is not None
-                and score < minimum_score
-            ):
+            if minimum_score is not None and score < minimum_score:
                 continue
 
             results.append(
@@ -220,9 +182,7 @@ class DenseRetriever:
             if len(results) >= top_k:
                 break
 
-        duration_ms = (
-            time.perf_counter() - search_start
-        ) * 1000
+        duration_ms = (time.perf_counter() - search_start) * 1000
 
         return DenseSearchResponse(
             query=cleaned_query,
@@ -241,22 +201,12 @@ class DenseRetriever:
             self.embedding_config_path,
         ]
 
-        missing_files = [
-            path
-            for path in required_files
-            if not path.exists()
-        ]
+        missing_files = [path for path in required_files if not path.exists()]
 
         if missing_files:
-            formatted_paths = "\n".join(
-                f"- {path}"
-                for path in missing_files
-            )
+            formatted_paths = "\n".join(f"- {path}" for path in missing_files)
 
-            raise FileNotFoundError(
-                "Fichiers nécessaires introuvables :\n"
-                f"{formatted_paths}"
-            )
+            raise FileNotFoundError(f"Fichiers nécessaires introuvables :\n{formatted_paths}")
 
     @staticmethod
     def _load_metadata(
@@ -276,47 +226,33 @@ class DenseRetriever:
                 start=1,
             ):
                 if not line.strip():
-                    raise ValueError(
-                        f"{metadata_path.name}, ligne "
-                        f"{line_number} vide."
-                    )
+                    raise ValueError(f"{metadata_path.name}, ligne {line_number} vide.")
 
                 try:
                     record = json.loads(line)
                 except json.JSONDecodeError as error:
                     raise ValueError(
-                        f"{metadata_path.name}, ligne "
-                        f"{line_number} : JSON invalide."
+                        f"{metadata_path.name}, ligne {line_number} : JSON invalide."
                     ) from error
 
                 if not isinstance(record, dict):
-                    raise ValueError(
-                        f"{metadata_path.name}, ligne "
-                        f"{line_number} : objet attendu."
-                    )
+                    raise ValueError(f"{metadata_path.name}, ligne {line_number} : objet attendu.")
 
                 vector_id = record.pop(
                     "vector_id",
                     None,
                 )
 
-                if (
-                    not isinstance(vector_id, int)
-                    or isinstance(vector_id, bool)
-                ):
+                if not isinstance(vector_id, int) or isinstance(vector_id, bool):
                     raise ValueError(
-                        f"{metadata_path.name}, ligne "
-                        f"{line_number} : vector_id invalide."
+                        f"{metadata_path.name}, ligne {line_number} : vector_id invalide."
                     )
 
                 try:
-                    chunk = DocumentChunk.model_validate(
-                        record
-                    )
+                    chunk = DocumentChunk.model_validate(record)
                 except ValidationError as error:
                     raise ValueError(
-                        f"{metadata_path.name}, ligne "
-                        f"{line_number} : chunk invalide."
+                        f"{metadata_path.name}, ligne {line_number} : chunk invalide."
                     ) from error
 
                 vector_ids.append(vector_id)
@@ -326,8 +262,7 @@ class DenseRetriever:
 
         if vector_ids != expected_vector_ids:
             raise ValueError(
-                "Les vector_id des métadonnées ne sont pas "
-                "continus et correctement ordonnés."
+                "Les vector_id des métadonnées ne sont pas continus et correctement ordonnés."
             )
 
         return chunks
@@ -336,19 +271,10 @@ class DenseRetriever:
         """Contrôler la cohérence minimale au chargement."""
 
         if type(self.index).__name__ != "IndexFlatIP":
-            raise ValueError(
-                "Type d'index inattendu : "
-                f"{type(self.index).__name__}."
-            )
+            raise ValueError(f"Type d'index inattendu : {type(self.index).__name__}.")
 
-        if (
-            int(self.index.metric_type)
-            != faiss.METRIC_INNER_PRODUCT
-        ):
-            raise ValueError(
-                "L'index FAISS n'utilise pas le produit "
-                "scalaire."
-            )
+        if int(self.index.metric_type) != faiss.METRIC_INNER_PRODUCT:
+            raise ValueError("L'index FAISS n'utilise pas le produit scalaire.")
 
         if int(self.index.ntotal) != len(self.metadata):
             raise ValueError(
@@ -359,17 +285,9 @@ class DenseRetriever:
             )
 
         if int(self.index.ntotal) == 0:
-            raise ValueError(
-                "L'index FAISS est vide."
-            )
+            raise ValueError("L'index FAISS est vide.")
 
-        chunk_ids = [
-            chunk.chunk_id
-            for chunk in self.metadata
-        ]
+        chunk_ids = [chunk.chunk_id for chunk in self.metadata]
 
         if len(chunk_ids) != len(set(chunk_ids)):
-            raise ValueError(
-                "Des chunk_id sont dupliqués dans les "
-                "métadonnées."
-            )
+            raise ValueError("Des chunk_id sont dupliqués dans les métadonnées.")

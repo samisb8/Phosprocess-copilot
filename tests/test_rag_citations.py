@@ -80,14 +80,16 @@ def test_controlled_insufficient_answer_without_citation_is_accepted() -> None:
     assert insufficient is True
 
 
-def test_insufficiency_sentence_mixed_with_affirmative_answer_is_rejected() -> None:
+def test_cited_partial_answer_may_end_with_an_insufficiency_notice() -> None:
     answer = (
         "Fouling reduces heat transfer [Source 1]. "
         f"{INSUFFICIENT_CONTEXT_ANSWER}"
     )
 
-    with pytest.raises(CitationValidationError, match="toute la réponse"):
-        validate_grounded_answer(
-            answer,
-            available_source_count=5,
-        )
+    citations, insufficient = validate_grounded_answer(
+        answer,
+        available_source_count=5,
+    )
+
+    assert citations == [1]
+    assert insufficient is False

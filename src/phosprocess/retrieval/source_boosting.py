@@ -63,10 +63,7 @@ def apply_soft_boosts(
     adjusted: list[BoostedResult] = []
 
     for result, base_score in zip(results, scores, strict=True):
-        if (
-            routing.hard_filter is not None
-            and result.document_id not in routing.hard_filter
-        ):
+        if routing.hard_filter is not None and result.document_id not in routing.hard_filter:
             continue
 
         source_boost = routing.soft_boosts.get(result.document_id, 0.0)

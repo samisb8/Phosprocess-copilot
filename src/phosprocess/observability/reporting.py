@@ -17,17 +17,13 @@ from uuid import uuid4
 BASELINE_TURNS: tuple[dict[str, Any], ...] = (
     {
         "turn": 1,
-        "question": (
-            "Quel est le rôle de la recirculation dans le réacteur Jacobs ?"
-        ),
+        "question": ("Quel est le rôle de la recirculation dans le réacteur Jacobs ?"),
         "time_to_first_token_ms": 31_410.0,
         "total_ms": 65_060.0,
     },
     {
         "turn": 2,
-        "question": (
-            "Et pourquoi améliore-t-elle la stabilité du procédé ?"
-        ),
+        "question": ("Et pourquoi améliore-t-elle la stabilité du procédé ?"),
         "time_to_first_token_ms": 64_140.0,
         "total_ms": 130_910.0,
     },
@@ -127,9 +123,7 @@ def _average(records: Sequence[Mapping[str, Any]], field: str) -> float:
     """Average one numeric field over profile records."""
 
     values = [
-        float(record[field])
-        for record in records
-        if isinstance(record.get(field), (int, float))
+        float(record[field]) for record in records if isinstance(record.get(field), (int, float))
     ]
     return round(mean(values), 3) if values else 0.0
 
@@ -204,22 +198,14 @@ def write_latency_reports(
                 "estimated_prompt_tokens",
             ),
             "total_ollama_calls": sum(
-                int(record.get("ollama_call_count", 0))
-                for record in records
+                int(record.get("ollama_call_count", 0)) for record in records
             ),
-            "repair_count": sum(
-                bool(record.get("repair_attempted"))
-                for record in records
-            ),
+            "repair_count": sum(bool(record.get("repair_attempted")) for record in records),
             "average_prompt_evaluation_ms": (
-                round(mean(prompt_evaluation_durations), 3)
-                if prompt_evaluation_durations
-                else 0.0
+                round(mean(prompt_evaluation_durations), 3) if prompt_evaluation_durations else 0.0
             ),
             "average_generation_tokens_per_second": (
-                round(mean(token_rates), 3)
-                if token_rates
-                else 0.0
+                round(mean(token_rates), 3) if token_rates else 0.0
             ),
         },
         "turns": [dict(record) for record in records],
@@ -231,30 +217,18 @@ def write_latency_reports(
         prompt_rows.append(
             {
                 "turn": record["turn"],
-                "baseline_equivalent_characters": record[
-                    "baseline_equivalent_prompt_characters"
-                ],
-                "baseline_equivalent_tokens": record[
-                    "baseline_equivalent_prompt_tokens"
-                ],
-                "optimized_characters": record[
-                    "prompt_character_count"
-                ],
-                "optimized_tokens": record[
-                    "estimated_prompt_tokens"
-                ],
+                "baseline_equivalent_characters": record["baseline_equivalent_prompt_characters"],
+                "baseline_equivalent_tokens": record["baseline_equivalent_prompt_tokens"],
+                "optimized_characters": record["prompt_character_count"],
+                "optimized_tokens": record["estimated_prompt_tokens"],
                 "token_reduction_percent": _percentage_reduction(
                     float(record["baseline_equivalent_prompt_tokens"]),
                     float(record["estimated_prompt_tokens"]),
                 ),
                 "system_tokens": record["system_prompt_token_count"],
                 "summary_tokens": record["summary_token_count"],
-                "recent_history_tokens": record[
-                    "recent_history_token_count"
-                ],
-                "document_context_tokens": record[
-                    "document_context_token_count"
-                ],
+                "recent_history_tokens": record["recent_history_token_count"],
+                "document_context_tokens": record["document_context_token_count"],
                 "question_tokens": record["question_token_count"],
             }
         )
@@ -271,27 +245,15 @@ def write_latency_reports(
                     "streaming": call["streaming"],
                     "success": call["success"],
                     "prompt_characters": call["prompt_character_count"],
-                    "estimated_prompt_tokens": call[
-                        "estimated_prompt_tokens"
-                    ],
+                    "estimated_prompt_tokens": call["estimated_prompt_tokens"],
                     "duration_ms": call["duration_ms"],
-                    "time_to_first_event_ms": call[
-                        "time_to_first_event_ms"
-                    ],
-                    "time_to_first_token_ms": call[
-                        "time_to_first_token_ms"
-                    ],
+                    "time_to_first_event_ms": call["time_to_first_event_ms"],
+                    "time_to_first_token_ms": call["time_to_first_token_ms"],
                     "generation_ms": call["generation_ms"],
                     "generated_tokens": call["generated_token_count"],
-                    "prompt_evaluation_ms": call[
-                        "prompt_evaluation_ms"
-                    ],
-                    "model_generation_ms": call[
-                        "model_generation_ms"
-                    ],
-                    "generation_tokens_per_second": call[
-                        "generation_tokens_per_second"
-                    ],
+                    "prompt_evaluation_ms": call["prompt_evaluation_ms"],
+                    "model_generation_ms": call["model_generation_ms"],
+                    "generation_tokens_per_second": call["generation_tokens_per_second"],
                     "error_type": call["error_type"],
                 }
             )
@@ -302,9 +264,7 @@ def write_latency_reports(
         if float(record["turn_time_to_first_token_ms"]) < 15_000
     ]
     total_target_turns = [
-        str(record["turn"])
-        for record in records
-        if float(record["total_ms"]) < 45_000
+        str(record["turn"]) for record in records if float(record["total_ms"]) < 45_000
     ]
     comparison_lines = [
         "# Comparaison de latence du chat RAG",
@@ -324,12 +284,8 @@ def write_latency_reports(
             "| {turn} | {before_ttft:.2f} s | {after_ttft:.2f} s | "
             "{before_total:.2f} s | {after_total:.2f} s |".format(
                 turn=baseline_turn["turn"],
-                before_ttft=(
-                    baseline_turn["time_to_first_token_ms"] / 1000.0
-                ),
-                after_ttft=(
-                    float(record["turn_time_to_first_token_ms"]) / 1000.0
-                ),
+                before_ttft=(baseline_turn["time_to_first_token_ms"] / 1000.0),
+                after_ttft=(float(record["turn_time_to_first_token_ms"]) / 1000.0),
                 before_total=baseline_turn["total_ms"] / 1000.0,
                 after_total=float(record["total_ms"]) / 1000.0,
             )
@@ -368,14 +324,8 @@ def write_latency_reports(
                 f"- TTFT moyen : "
                 f"{optimized['aggregate']['average_time_to_first_token_ms'] / 1000:.2f} s"
             ),
-            (
-                f"- Durée totale moyenne : "
-                f"{optimized['aggregate']['average_total_ms'] / 1000:.2f} s"
-            ),
-            (
-                f"- Appels Ollama : "
-                f"{optimized['aggregate']['total_ollama_calls']}"
-            ),
+            (f"- Durée totale moyenne : {optimized['aggregate']['average_total_ms'] / 1000:.2f} s"),
+            (f"- Appels Ollama : {optimized['aggregate']['total_ollama_calls']}"),
             f"- Réparations : {optimized['aggregate']['repair_count']}",
             (
                 "- Cible < 15 s au premier token : atteinte aux tours "
@@ -394,12 +344,8 @@ def write_latency_reports(
     )
 
     paths = {
-        "latency_baseline.json": (
-            json.dumps(baseline, ensure_ascii=False, indent=2) + "\n"
-        ),
-        "latency_optimized.json": (
-            json.dumps(optimized, ensure_ascii=False, indent=2) + "\n"
-        ),
+        "latency_baseline.json": (json.dumps(baseline, ensure_ascii=False, indent=2) + "\n"),
+        "latency_optimized.json": (json.dumps(optimized, ensure_ascii=False, indent=2) + "\n"),
         "latency_per_turn.csv": _csv_text(records, PER_TURN_FIELDS),
         "latency_comparison.md": "\n".join(comparison_lines) + "\n",
         "prompt_size_comparison.csv": _csv_text(

@@ -25,8 +25,7 @@ class KnowledgeDomain(StrEnum):
 
 DOMAIN_DESCRIPTIONS: dict[KnowledgeDomain, str] = {
     KnowledgeDomain.PHOSPHORIC_ACID_PROCESS: (
-        "Wet-process phosphoric acid, phosphate reaction, filtration, "
-        "concentration and gypsum."
+        "Wet-process phosphoric acid, phosphate reaction, filtration, concentration and gypsum."
     ),
     KnowledgeDomain.PLANT_SPECIFIC: (
         "Installed plant, equipment, operating conditions and plant sequence."
@@ -53,9 +52,7 @@ DOMAIN_DESCRIPTIONS: dict[KnowledgeDomain, str] = {
     KnowledgeDomain.INSTRUMENTATION: (
         "Industrial measurements, sensors, actuators and control hardware."
     ),
-    KnowledgeDomain.EQUIPMENT: (
-        "Chemical-process equipment, design, operation and materials."
-    ),
+    KnowledgeDomain.EQUIPMENT: ("Chemical-process equipment, design, operation and materials."),
     KnowledgeDomain.SAFETY: "Process hazards and safe operation.",
     KnowledgeDomain.GENERAL_CHEMICAL_ENGINEERING: (
         "Cross-domain chemical-engineering reference material."

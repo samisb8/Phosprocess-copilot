@@ -7,7 +7,11 @@ import pytest
 from phosprocess.rag.citations import validate_grounded_answer
 from phosprocess.rag.conversation_memory import ConversationMemory
 from phosprocess.rag.conversation_state import ConversationState
-from phosprocess.rag.followup_resolver import resolve_standalone_query
+from phosprocess.rag.followup_resolver import (
+    _QueryResolverPayload,
+    resolve_ambiguous_query_with_llm,
+    resolve_standalone_query,
+)
 from phosprocess.rag.language import (
     ResponseLanguage,
     detect_response_language,
@@ -74,15 +78,15 @@ def test_followup_uses_business_entities_but_not_old_evidence() -> None:
     assert "old.pdf" not in resolution.standalone_query
 
 
-def test_evaporator_context_tracks_process_fluid_and_operation() -> None:
+def test_conversation_state_does_not_infer_unmentioned_domain_context() -> None:
     state = ConversationState()
     state.observe_question(
         "C’est quoi un évaporateur à circulation forcée ?"
     )
 
     assert state.current_equipment == "évaporateur à circulation forcée"
-    assert state.current_fluid == "acide phosphorique"
-    assert state.current_operation == "concentration par évaporation"
+    assert state.current_fluid is None
+    assert state.current_operation is None
 
 
 def test_autonomous_question_is_not_rewritten() -> None:
@@ -193,7 +197,7 @@ def test_arabic_role_question_is_explanation_not_definition() -> None:
     assert result.question_type is QuestionType.EXPLANATION
 
 
-def test_bare_why_followup_resolves_pump_necessity() -> None:
+def test_bare_why_followup_resolves_entity_without_hidden_intent() -> None:
     state = ConversationState()
     state.observe_question(
         "Quel est le rôle de la pompe de circulation dans l'évaporateur ?"
@@ -204,7 +208,7 @@ def test_bare_why_followup_resolves_pump_necessity() -> None:
     assert resolution.standalone_query == (
         "Pourquoi la pompe de circulation est-elle nécessaire ?"
     )
-    assert resolution.intent_hint == "pump_necessity"
+    assert resolution.intent_hint is None
 
 
 def test_momentum_diffusion_has_dedicated_question_type() -> None:
@@ -232,3 +236,115 @@ def test_synchronized_business_state_persists_explicit_source_lock() -> None:
     assert context.business_state.current_source_mode == "becker"
     assert context.business_state.source_scope_explicit is True
     assert context.business_state.focus_entity == "pompe de circulation"
+
+
+class _FakeQueryResolverLLM:
+    def __init__(self, standalone_query: str) -> None:
+        self.standalone_query = standalone_query
+        self.calls = 0
+        self.user_prompt = ""
+
+    def chat_json_with_raw(self, **kwargs: object) -> tuple[_QueryResolverPayload, str]:
+        self.calls += 1
+        self.user_prompt = str(kwargs["user_prompt"])
+        payload = _QueryResolverPayload(
+            standalone_query=self.standalone_query,
+            is_followup=True,
+            inherits_source=False,
+            explicit_source=None,
+        )
+        return payload, payload.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    ("previous", "followup", "standalone"),
+    [
+        (
+            "Pourquoi la stabilité en boucle fermée est-elle importante ?",
+            "Et comment cela affecte-t-il les perturbations de débit ?",
+            (
+                "Comment la stabilité en boucle fermée affecte-t-elle les "
+                "perturbations de débit ?"
+            ),
+        ),
+        (
+            "Décris le trajet de l’acide indiqué par le rapport d’atelier.",
+            "Et après l’échangeur, où va-t-il ?",
+            "Où va l’acide après l’échangeur dans le trajet décrit ?",
+        ),
+    ],
+)
+def test_llm_resolver_handles_only_ambiguous_followups(
+    previous: str,
+    followup: str,
+    standalone: str,
+) -> None:
+    state = ConversationState()
+    state.observe_question(previous)
+    state.record_resolution(previous)
+    llm = _FakeQueryResolverLLM(standalone)
+
+    resolution = resolve_ambiguous_query_with_llm(
+        followup,
+        state=state,
+        llm=llm,
+    )
+
+    assert llm.calls == 1
+    assert resolution.standalone_query == standalone
+    assert resolution.followup_detected is True
+    assert resolution.resolver_type == "llm_ambiguous_followup"
+    assert resolution.resolver_llm_call_count == 1
+    assert previous in llm.user_prompt
+    assert "assistant" not in llm.user_prompt.casefold()
+
+
+def test_llm_resolver_is_not_called_for_unambiguous_question() -> None:
+    state = ConversationState(current_equipment="évaporateur")
+    llm = _FakeQueryResolverLLM("unused")
+
+    resolution = resolve_ambiguous_query_with_llm(
+        "What is the role of the heat exchanger?",
+        state=state,
+        llm=llm,
+    )
+
+    assert llm.calls == 0
+    assert resolution.resolver_type == "none"
+
+
+def test_llm_resolver_binds_plural_referent_when_state_is_too_broad() -> None:
+    state = ConversationState()
+    previous = "What variables should be measured to control an evaporator?"
+    state.observe_question(previous)
+    state.record_resolution(previous)
+    standalone = "Quelles variables de contrôle peuvent être manipulées ?"
+    llm = _FakeQueryResolverLLM(standalone)
+
+    resolution = resolve_ambiguous_query_with_llm(
+        "Et lesquelles peuvent être manipulées ?",
+        state=state,
+        llm=llm,
+    )
+
+    assert llm.calls == 1
+    assert resolution.standalone_query == standalone
+    assert previous in llm.user_prompt
+
+
+def test_llm_resolver_confirms_pronoun_even_when_lexical_rewrite_exists() -> None:
+    state = ConversationState()
+    previous = "Quel est le rôle de la recirculation dans le réacteur ?"
+    state.observe_question(previous)
+    state.record_resolution(previous)
+    standalone = "Pourquoi la recirculation améliore-t-elle la stabilité du procédé ?"
+    llm = _FakeQueryResolverLLM(standalone)
+
+    resolution = resolve_ambiguous_query_with_llm(
+        "Et pourquoi améliore-t-elle la stabilité du procédé ?",
+        state=state,
+        llm=llm,
+    )
+
+    assert llm.calls == 1
+    assert resolution.standalone_query == standalone

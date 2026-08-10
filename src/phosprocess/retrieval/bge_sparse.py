@@ -101,9 +101,7 @@ def build_bge_sparse_index(
         raise ValueError("Le corpus qualité est vide.")
     dense_metadata_path = version_directory / "dense" / "metadata.jsonl"
     if not dense_metadata_path.is_file():
-        raise FileNotFoundError(
-            f"Métadonnées denses introuvables : {dense_metadata_path}"
-        )
+        raise FileNotFoundError(f"Métadonnées denses introuvables : {dense_metadata_path}")
     dense_metadata = _load_dense_metadata(dense_metadata_path)
     child_by_id: dict[str, TechnicalChildChunk] = {}
     duplicate_child_ids: set[str] = set()
@@ -113,10 +111,7 @@ def build_bge_sparse_index(
         child_by_id[chunk.chunk_id] = chunk
     if duplicate_child_ids:
         examples = ", ".join(sorted(duplicate_child_ids)[:5])
-        raise ValueError(
-            "chunks.jsonl contient des chunk_id dupliqués; "
-            f"exemples: {examples}."
-        )
+        raise ValueError(f"chunks.jsonl contient des chunk_id dupliqués; exemples: {examples}.")
 
     dense_ids = [chunk.chunk_id for chunk in dense_metadata]
     if len(dense_ids) != len(set(dense_ids)):
@@ -146,9 +141,7 @@ def build_bge_sparse_index(
 
     for start in range(0, len(aligned_chunks), batch_documents):
         batch = aligned_chunks[start : start + batch_documents]
-        weights_batch = embedder.embed_sparse_documents(
-            [chunk.embedding_text for chunk in batch]
-        )
+        weights_batch = embedder.embed_sparse_documents([chunk.embedding_text for chunk in batch])
         for offset, weights in enumerate(weights_batch):
             row = start + offset
             for token_id, weight in weights.items():
@@ -235,9 +228,7 @@ class BGESparseRetriever:
         if self.manifest.get("index_version") != SPARSE_INDEX_VERSION:
             raise ValueError("Version d'index BGE sparse non prise en charge.")
         if self.manifest.get("model_name") != self.embedder.model_name:
-            raise ValueError(
-                "L'index BGE sparse a été construit avec un autre modèle."
-            )
+            raise ValueError("L'index BGE sparse a été construit avec un autre modèle.")
         if self.matrix.shape[0] != len(self.metadata):
             raise ValueError("L'index BGE sparse et les métadonnées dense sont désalignés.")
         expected_digest = _chunk_id_digest(self.metadata)

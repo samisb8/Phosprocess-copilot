@@ -21,6 +21,8 @@ def test_catalog_contains_exactly_eight_unique_documents() -> None:
     assert len(catalog.documents) == 8
     assert len({document.document_id for document in catalog.documents}) == 8
     assert len({document.canonical_filename for document in catalog.documents}) == 8
+    assert all(document.aliases for document in catalog.documents)
+    assert len({document.aliases[0] for document in catalog.documents}) == 8
 
 
 def test_catalog_assigns_domains_explicitly() -> None:

@@ -1,0 +1,16 @@
+{
+  "run_at": "2026-08-10T13:08:24.042928+00:00",
+  "baseline_sha256": "5c7bfba970cdc1a14e928fffe823c8bceb87701eb8eefe4f4e3f4f46cfcbf16e",
+  "warmup": {
+    "enabled": true,
+    "embedding_ms": 643.8175000075717,
+    "reranker_ms": 1447.8702000051271,
+    "ollama_ms": 3254.4553999905474,
+    "total_ms": 5346.172999998089,
+    "ollama_call_count": 1
+  },
+  "written_this_run": 3,
+  "completed_records": 3,
+  "expected_records": 3,
+  "complete": true
+}

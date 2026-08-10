@@ -38,7 +38,7 @@ class RAGSource(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    source_number: int = Field(ge=1, le=5)
+    source_number: int = Field(ge=1)
     chunk_id: str = Field(min_length=1)
     document_name: str = Field(min_length=1)
     pages: list[int] = Field(min_length=1)
@@ -50,12 +50,16 @@ class RAGSource(BaseModel):
     page_start: int | None = Field(default=None, ge=1)
     page_end: int | None = Field(default=None, ge=1)
     anchor_chunk_id: str | None = None
+    anchor_chunk_ids: list[str] = Field(default_factory=list)
     expanded_chunk_ids: list[str] = Field(default_factory=list)
+    supporting_chunk_ids: list[str] = Field(default_factory=list)
     display_text: str | None = None
     anchor_text: str | None = None
     domain: str | None = None
     chunk_type: str | None = None
     parent_id: str | None = None
+    context_scope: str | None = None
+    best_anchor_score: float | None = None
     source_boost: float | None = None
     context_added_tokens: int | None = Field(default=None, ge=0)
     context_truncated: bool = False
@@ -91,7 +95,7 @@ class RAGResponse(BaseModel):
 
     question: str = Field(min_length=1)
     answer: str = Field(min_length=1)
-    sources: list[RAGSource] = Field(default_factory=list, max_length=5)
+    sources: list[RAGSource] = Field(default_factory=list)
     cited_source_numbers: list[int] = Field(default_factory=list)
     insufficient_context: bool
 
@@ -99,8 +103,8 @@ class RAGResponse(BaseModel):
     selected_variant: str = Field(min_length=1)
     snapshot_sha256: str = Field(pattern=r"^[A-F0-9]{64}$")
 
-    candidate_count: int = Field(ge=0, le=30)
-    selected_count: int = Field(ge=0, le=5)
+    candidate_count: int = Field(ge=0)
+    selected_count: int = Field(ge=0)
     source_policy_route: str = "disabled"
     source_policy_mode: str = "automatic"
     source_policy_primary: str | None = None
@@ -115,20 +119,22 @@ class RAGResponse(BaseModel):
 
     @model_validator(mode="after")
     def validate_retrieval_cardinality(self) -> RAGResponse:
-        """Allow either a five-source RAG run or an explicit direct bypass."""
+        """Allow a direct bypass or any non-empty retrieval selection."""
 
         counts = (self.candidate_count, self.selected_count)
         if counts == (0, 0):
             if self.sources or self.cited_source_numbers:
-                raise ValueError(
-                    "Une réponse directe ne peut pas contenir de sources RAG."
-                )
+                raise ValueError("Une réponse directe ne peut pas contenir de sources RAG.")
             return self
 
-        if self.candidate_count < 1 or self.selected_count != 5:
+        if self.candidate_count < 1 or self.selected_count < 1:
             raise ValueError(
-                "Une réponse RAG exige des candidats et exactement cinq "
-                "sources sélectionnées."
+                "Une réponse RAG exige au moins un candidat et une source sélectionnée."
+            )
+
+        if self.selected_count > self.candidate_count:
+            raise ValueError(
+                "Le nombre de sources sélectionnées ne peut pas dépasser les candidats."
             )
 
         return self
@@ -170,6 +176,6 @@ class RAGStreamEvent(BaseModel):
         "error",
     ]
     content: str | None = None
-    sources: list[RAGSource] = Field(default_factory=list, max_length=5)
+    sources: list[RAGSource] = Field(default_factory=list)
     response: RAGResponse | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

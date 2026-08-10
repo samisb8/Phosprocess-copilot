@@ -10,9 +10,7 @@ from typing import Any
 
 from phosprocess.knowledge_base.runtime import PROJECT_ROOT
 
-DEFAULT_DOMAIN_QUALITY_DIRECTORY = (
-    PROJECT_ROOT / "data" / "evaluation" / "domain_quality" / "v1"
-)
+DEFAULT_DOMAIN_QUALITY_DIRECTORY = PROJECT_ROOT / "data" / "evaluation" / "domain_quality" / "v1"
 
 MINIMUM_CATEGORIES = {
     "phosphoric_acid": 10,

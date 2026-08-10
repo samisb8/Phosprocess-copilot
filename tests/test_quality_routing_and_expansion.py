@@ -69,59 +69,8 @@ def parent(children: list[TechnicalChildChunk]) -> TechnicalParentChunk:
     )
 
 
-def test_automatic_routing_uses_soft_boosts_without_filter() -> None:
-    catalog = load_document_catalog()
-    decision = route_query(
-        "Comment la sursaturation influence-t-elle le gypse ?",
-        catalog=catalog,
-    )
-
-    domains = {domain for domain, _score in decision.detected_domains}
-    assert KnowledgeDomain.CRYSTALLIZATION in domains
-    assert KnowledgeDomain.PHOSPHORIC_ACID_PROCESS in domains
-    assert decision.hard_filter is None
-    assert "mullin_crystallization" in decision.preferred_documents
-    assert "becker_phosphates_and_phosphoric_acid" in (
-        decision.preferred_documents
-    )
 
 
-@pytest.mark.parametrize(
-    ("question", "expected_document"),
-    [
-        (
-            "phosphoric acid filtration",
-            "becker_phosphates_and_phosphoric_acid",
-        ),
-        (
-            "enthalpy and vapor pressure",
-            "smith_van_ness_chemical_engineering_thermodynamics",
-        ),
-        (
-            "heat exchanger conduction",
-            "incropera_fundamentals_heat_mass_transfer",
-        ),
-        ("pressure drop in fluid flow", "bird_transport_phenomena"),
-        ("supersaturation and nucleation", "mullin_crystallization"),
-        ("MPC process control", "seborg_process_dynamics_control"),
-        (
-            "general chemical engineering unit operation",
-            "perrys_chemical_engineers_handbook",
-        ),
-        (
-            "What is a forced-circulation evaporator?",
-            "perrys_chemical_engineers_handbook",
-        ),
-    ],
-)
-def test_domain_routes_favor_the_domain_reference(
-    question: str,
-    expected_document: str,
-) -> None:
-    decision = route_query(question, catalog=load_document_catalog())
-
-    assert decision.preferred_documents[0] == expected_document
-    assert decision.hard_filter is None
 
 
 def test_non_preferred_high_score_can_beat_preferred_low_score() -> None:
@@ -168,20 +117,34 @@ def test_multilingual_query_expansion_preserves_original() -> None:
     assert "recirculation" not in result.added_terms
 
 
+
 def test_arabic_query_adds_english_technical_equivalent() -> None:
-    result = expand_technical_query(
-        "ما هو دور المبادل الحراري في المبخر؟"
+    question = (
+        "\u0645\u0627 \u0647\u0648 \u062f\u0648\u0631 "
+        "\u0627\u0644\u0645\u0628\u0627\u062f\u0644 "
+        "\u0627\u0644\u062d\u0631\u0627\u0631\u064a "
+        "\u0641\u064a "
+        "\u0627\u0644\u0645\u0628\u062e\u0631\u061f"
     )
+
+    result = expand_technical_query(
+        question
+    )
+
+    assert "heat exchanger" in result.added_terms
+
     decision = route_query(
         result.original_query,
         catalog=load_document_catalog(),
     )
 
-    assert "heat exchanger" in result.added_terms
-    assert (
-        decision.preferred_documents[0]
-        == "incropera_fundamentals_heat_mass_transfer"
-    )
+    # Automatic routing understands the query but deliberately
+    # leaves document selection to global retrieval + reranking.
+    assert decision.source_mode == "auto"
+    assert decision.hard_filter is None
+    assert decision.preferred_documents == ()
+    assert decision.soft_boosts == {}
+
 
 
 def test_process_expansion_adds_ordered_same_document_context() -> None:
@@ -213,7 +176,7 @@ def test_process_expansion_adds_ordered_same_document_context() -> None:
     assert bundles[0].parent_included is True
 
 
-def test_definition_expansion_keeps_anchor_under_budget() -> None:
+def test_definition_expansion_uses_parent_when_it_fits_budget() -> None:
     children = [child(number) for number in range(1, 4)]
     expander = ContextExpander(
         children=children,
@@ -225,11 +188,11 @@ def test_definition_expansion_keeps_anchor_under_budget() -> None:
         question_type="definition",
     )
 
-    assert bundles[0].expanded_chunk_ids == ("chunk_2",)
+    assert bundles[0].expanded_chunk_ids == ("chunk_1", "chunk_2", "chunk_3")
     assert bundles[0].token_count <= 650
 
 
-def test_five_oversized_anchors_are_preserved_under_global_budget() -> None:
+def test_dynamic_packing_preserves_independent_anchors_within_budget() -> None:
     children = [
         child(number, document_id=f"document_{number}")
         for number in range(1, 6)
@@ -237,6 +200,7 @@ def test_five_oversized_anchors_are_preserved_under_global_budget() -> None:
 
     for item in children:
         item.token_count = 560
+        item.parent_id = f"parent_{item.document_id}"
 
     expander = ContextExpander(
         children=children,
@@ -256,7 +220,7 @@ def test_five_oversized_anchors_are_preserved_under_global_budget() -> None:
 
     assert len(bundles) == 5
     assert sum(bundle.token_count for bundle in bundles) <= 2600
-    assert all(bundle.context_truncated for bundle in bundles)
+    assert all(bundle.context_scope == "anchor_only" for bundle in bundles)
 
 
 def test_parent_expansion_never_truncates_away_the_anchor() -> None:
@@ -265,7 +229,7 @@ def test_parent_expansion_never_truncates_away_the_anchor() -> None:
         children=children,
         parents=[parent(children)],
         config=ContextExpansionConfig(
-            max_tokens_per_bundle=150,
+            max_tokens_per_bundle=250,
             max_total_context_tokens=750,
         ),
     )
@@ -296,9 +260,10 @@ def test_process_flow_query_adds_sequence_retrieval_terms() -> None:
     )
 
     assert "flow path" in result.dense_query
-    assert "circulation pump" in result.bm25_expanded_query
-    assert "flash chamber" in result.bm25_expanded_query
-    assert "product outlet" in result.added_terms
+    assert {"process sequence", "entry", "transition", "exit"}.issubset(
+        set(result.added_terms)
+    )
+    assert "product outlet" not in result.added_terms
 
 
 def test_large_process_anchor_receives_partial_neighbor_context() -> None:
@@ -339,20 +304,6 @@ def test_explicit_becker_wording_hard_filters_only_becker() -> None:
     )
 
 
-def test_ocp_context_is_soft_not_an_implicit_hard_filter() -> None:
-    decision = route_query(
-        "Établis le bilan thermique de l'échelon J de JFC4.",
-        catalog=load_document_catalog(),
-        question_type="balance",
-    )
-
-    assert decision.hard_filter is None
-    assert decision.preferred_documents[0] == (
-        "ocp_phosphoric_acid_workshop_report"
-    )
-    assert "smith_van_ness_chemical_engineering_thermodynamics" in (
-        decision.preferred_documents
-    )
 
 
 def test_ocp_report_is_routed_for_multiple_internal_technical_domains() -> None:
@@ -373,23 +324,31 @@ def test_ocp_report_is_routed_for_multiple_internal_technical_domains() -> None:
     }.issubset(set(report.domains))
 
 
+
 @pytest.mark.parametrize(
     "question",
     [
-        "Établis le bilan de P2O5 de l'échelon J de JFC4.",
-        "Analyse l'encrassement de l'échangeur de l'atelier OCP JFC4.",
-        "Quelle est la capacité évaporatoire réelle de l'échelon J ?",
+        "?tablis le bilan de P2O5 de l'?chelon J de JFC4.",
+        "Analyse l'encrassement de l'?changeur de l'atelier OCP JFC4.",
+        "Quelle est la capacit? ?vaporatoire r?elle de l'?chelon J ?",
     ],
 )
-def test_plant_specific_technical_questions_prioritize_ocp_report(
+def test_plant_specific_questions_do_not_preselect_a_document(
     question: str,
 ) -> None:
-    decision = route_query(question, catalog=load_document_catalog())
-
-    assert decision.hard_filter is None
-    assert decision.preferred_documents[0] == (
-        "ocp_phosphoric_acid_workshop_report"
+    decision = route_query(
+        question,
+        catalog=load_document_catalog(),
     )
+
+    assert decision.source_mode == "auto"
+    assert decision.hard_filter is None
+
+    # Critical RAG-05.8 invariant:
+    # no question -> book decision before actual retrieval.
+    assert decision.preferred_documents == ()
+    assert decision.soft_boosts == {}
+
 
 
 def test_explicit_report_wording_hard_filters_ocp_report() -> None:
@@ -402,16 +361,9 @@ def test_explicit_report_wording_hard_filters_ocp_report() -> None:
     assert decision.hard_filter == frozenset(
         {"ocp_phosphoric_acid_workshop_report"}
     )
-    assert "bilan thermique" in decision.section_affinity_terms
+    assert decision.section_affinity_terms == ()
 
 
-def test_mass_transfer_diffusion_prioritizes_bird() -> None:
-    decision = route_query(
-        "Explique la diffusion et le transfert de masse dans un fluide.",
-        catalog=load_document_catalog(),
-    )
-
-    assert decision.preferred_documents[0] == "bird_transport_phenomena"
 
 
 def test_kern_seaton_request_targets_report_fouling_section() -> None:
@@ -421,24 +373,14 @@ def test_kern_seaton_request_targets_report_fouling_section() -> None:
     )
 
     assert decision.source_mode == "report"
-    assert "resistance d encrassement" in decision.section_affinity_terms
-
-
-def test_momentum_diffusion_routes_to_bird_not_mass_transfer() -> None:
-    decision = route_query(
-        "Explain momentum diffusion in a fluid according to Bird.",
-        catalog=load_document_catalog(),
-        question_type="momentum_diffusion",
+    assert decision.hard_filter == frozenset(
+        {"ocp_phosphoric_acid_workshop_report"}
     )
 
-    domains = {domain for domain, _score in decision.detected_domains}
-    assert decision.preferred_documents[0] == "bird_transport_phenomena"
-    assert KnowledgeDomain.FLUID_MECHANICS in domains
-    assert KnowledgeDomain.MASS_TRANSFER not in domains
-    assert "newton s law of viscosity" in decision.section_affinity_terms
 
 
-def test_jfc4_p2o5_balance_has_report_section_hints() -> None:
+
+def test_explicit_report_balance_has_no_hidden_section_hints() -> None:
     decision = route_query(
         "Établis le bilan de P2O5 de l’échelon J de JFC4 selon le rapport OCP.",
         catalog=load_document_catalog(),
@@ -449,8 +391,7 @@ def test_jfc4_p2o5_balance_has_report_section_hints() -> None:
     assert decision.hard_filter == frozenset(
         {"ocp_phosphoric_acid_workshop_report"}
     )
-    assert "ligne 6 sortie bouilleur" in decision.section_affinity_terms
-    assert "p2o5 entraine" in decision.section_affinity_terms
+    assert decision.section_affinity_terms == ()
 
 
 def test_user_can_explicitly_release_a_source_lock() -> None:
@@ -468,5 +409,48 @@ def test_momentum_query_expansion_uses_bird_vocabulary() -> None:
     )
 
     assert "molecular transport of momentum" in result.added_terms
-    assert "Newton law of viscosity" in result.added_terms
     assert "concentration gradient" not in result.bm25_expanded_query
+
+
+def test_automatic_routing_defers_document_selection_to_retrieval() -> None:
+    decision = route_query(
+        "Explique le transfert thermique dans un ?vaporateur.",
+        catalog=load_document_catalog(),
+        question_type="explanation",
+    )
+
+    assert decision.source_mode == "auto"
+    assert decision.hard_filter is None
+    assert decision.preferred_documents == ()
+    assert decision.soft_boosts == {}
+    assert decision.detected_domains
+
+
+def test_plant_context_does_not_preselect_the_plant_report() -> None:
+    decision = route_query(
+        "?tablis le bilan thermique de l'?chelon J de JFC4.",
+        catalog=load_document_catalog(),
+        question_type="balance",
+    )
+
+    assert decision.hard_filter is None
+    assert decision.preferred_documents == ()
+    assert decision.soft_boosts == {}
+
+    assert decision.source_mode == "auto"
+
+
+def test_explicit_document_request_still_hard_filters() -> None:
+    decision = route_query(
+        "Explique le proc?d? uniquement selon Becker.",
+        catalog=load_document_catalog(),
+        question_type="explanation",
+    )
+
+    assert decision.source_mode == "becker"
+    assert decision.hard_filter == frozenset(
+        {"becker_phosphates_and_phosphoric_acid"}
+    )
+    assert decision.preferred_documents == (
+        "becker_phosphates_and_phosphoric_acid",
+    )

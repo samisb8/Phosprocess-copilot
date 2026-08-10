@@ -5,7 +5,7 @@ ingestion:
   fallback_parser: pymupdf
   table_structure: true
   formula_enrichment: false
-  batch_page_count: 500
+  batch_page_count: 100
   maximum_corrupted_fraction: 0.30
   ocr:
     enabled: false
@@ -51,28 +51,19 @@ retrieval:
 
 answer_policy:
   definition:
-    max_words: 140
   explanation:
-    max_words: 230
   process_flow:
-    max_words: 320
     numbered_steps: true
   procedure:
-    max_words: 320
     numbered_steps: true
   comparison:
-    max_words: 260
   balance:
-    max_words: 300
     define_variables: true
     preserve_units: true
   equation_explanation:
-    max_words: 300
     define_variables: true
     preserve_units: true
   calculation:
-    max_words: 350
     show_assumptions: true
   troubleshooting:
-    max_words: 300
     organize_as_causes_effects_actions: true

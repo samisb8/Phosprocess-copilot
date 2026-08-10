@@ -1,0 +1,11 @@
+{
+  "scope": "DEV only",
+  "evaluator_sha256": "648e99fc7df3f6f8cbadd516506e8f5f895a5240ace5e19c1b3ebfe89c1f850f",
+  "evaluation_protocol_sha256": "1a5a3119360766cb4767579e1cb7d368e8b13232db0023422ed10829b6d91cfa",
+  "dev_results_sha256": "3ca3379a4492858be9a71e67391cffbe8e07295a0d00bb29d8a8c308c8a45e51",
+  "objective_checks_sha256": "dfd458cfde67290bd337218c59ad2f6de0c60fed2337487c0034465781673151",
+  "claim_extraction_sha256": "10982cb2ef59f8c5ef02672aafa4b06d64b4863613651e44fbdd37820db6d13c",
+  "dev_record_count": 52,
+  "holdout_seen": false,
+  "semantic_judge_used": false
+}

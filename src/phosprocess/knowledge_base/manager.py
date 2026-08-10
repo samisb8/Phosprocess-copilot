@@ -140,11 +140,7 @@ class SyncPlan:
 
     @property
     def active_entries(self) -> tuple[ScannedPDF, ...]:
-        return tuple(
-            entry
-            for entry in self.entries
-            if entry.active_candidate
-        )
+        return tuple(entry for entry in self.entries if entry.active_candidate)
 
     def count(self, status: str) -> int:
         return sum(entry.status == status for entry in self.entries)
@@ -163,11 +159,7 @@ class SyncPlan:
 
     @property
     def changes_require_rebuild(self) -> bool:
-        return bool(
-            self.count("new")
-            or self.count("modified")
-            or self.removed
-        )
+        return bool(self.count("new") or self.count("modified") or self.removed)
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,13 +217,9 @@ class KnowledgeBaseManager:
             )
 
             self._processor = ProductionDocumentProcessor(
-                chunking_config_path=(
-                    self.project_root / "configs" / "chunking.yaml"
-                ),
+                chunking_config_path=(self.project_root / "configs" / "chunking.yaml"),
                 postprocessing_config_path=(
-                    self.project_root
-                    / "configs"
-                    / "chunk_postprocessing.yaml"
+                    self.project_root / "configs" / "chunk_postprocessing.yaml"
                 ),
             )
 
@@ -244,9 +232,7 @@ class KnowledgeBaseManager:
             )
 
             self._index_builder = VersionIndexBuilder(
-                embedding_config_path=(
-                    self.project_root / "configs" / "embeddings.yaml"
-                ),
+                embedding_config_path=(self.project_root / "configs" / "embeddings.yaml"),
                 retrieval_config_path=(
                     self.project_root
                     / "data"
@@ -258,16 +244,9 @@ class KnowledgeBaseManager:
                     / "retrieval_v2.yaml"
                 ),
                 legacy_dense_directory=(
-                    self.project_root
-                    / "data"
-                    / "indexes"
-                    / "dense"
-                    / "bge_m3"
+                    self.project_root / "data" / "indexes" / "dense" / "bge_m3"
                 ),
-                embedding_cache_path=(
-                    self.paths.processed
-                    / "embedding_cache.sqlite"
-                ),
+                embedding_cache_path=(self.paths.processed / "embedding_cache.sqlite"),
             )
 
         return self._index_builder
@@ -288,26 +267,15 @@ class KnowledgeBaseManager:
                 sample_size = min(12, document.page_count)
                 sample_pages = sorted(
                     {
-                        round(
-                            index
-                            * (document.page_count - 1)
-                            / max(1, sample_size - 1)
-                        )
+                        round(index * (document.page_count - 1) / max(1, sample_size - 1))
                         for index in range(sample_size)
                     }
                 )
                 sampled_text = "\n".join(
-                    document.load_page(page_number).get_text("text")
-                    for page_number in sample_pages
+                    document.load_page(page_number).get_text("text") for page_number in sample_pages
                 )
-                visible_count = sum(
-                    not character.isspace()
-                    for character in sampled_text
-                )
-                letter_count = sum(
-                    character.isalpha()
-                    for character in sampled_text
-                )
+                visible_count = sum(not character.isspace() for character in sampled_text)
+                letter_count = sum(character.isalpha() for character in sampled_text)
                 word_count = len(
                     re.findall(
                         r"(?u)[^\W\d_]{3,}",
@@ -323,8 +291,7 @@ class KnowledgeBaseManager:
                     )
 
                 if visible_count >= 500 and (
-                    letter_count / visible_count < 0.15
-                    or word_count < 10
+                    letter_count / visible_count < 0.15 or word_count < 10
                 ):
                     return (
                         False,
@@ -428,11 +395,7 @@ class KnowledgeBaseManager:
             status = (
                 "new"
                 if previous is None
-                else (
-                    "unchanged"
-                    if previous.sha256 == entry.sha256
-                    else "modified"
-                )
+                else ("unchanged" if previous.sha256 == entry.sha256 else "modified")
             )
             entries.append(
                 ScannedPDF(
@@ -445,27 +408,17 @@ class KnowledgeBaseManager:
                 )
             )
 
-        active_names = {
-            entry.filename
-            for entry in entries
-            if entry.active_candidate
-        }
+        active_names = {entry.filename for entry in entries if entry.active_candidate}
         removed = tuple(
             document
             for filename, document in sorted(previous_active.items())
             if filename not in active_names
         )
 
-        document_ids = [
-            entry.document_id
-            for entry in entries
-            if entry.active_candidate
-        ]
+        document_ids = [entry.document_id for entry in entries if entry.active_candidate]
 
         if len(document_ids) != len(set(document_ids)):
-            raise KnowledgeBaseSyncError(
-                "Deux PDF actifs produisent le même document_id."
-            )
+            raise KnowledgeBaseSyncError("Deux PDF actifs produisent le même document_id.")
 
         return SyncPlan(
             entries=tuple(entries),
@@ -493,12 +446,7 @@ class KnowledgeBaseManager:
         document_id: str,
         digest: str,
     ) -> Path:
-        return (
-            self.paths.processed
-            / "documents"
-            / document_id
-            / digest
-        )
+        return self.paths.processed / "documents" / document_id / digest
 
     @staticmethod
     def _read_chunk_records(path: Path) -> list[dict[str, Any]]:
@@ -510,9 +458,7 @@ class KnowledgeBaseManager:
                     value = json.loads(line)
 
                     if not isinstance(value, dict):
-                        raise ValueError(
-                            f"Enregistrement de chunk invalide : {path}"
-                        )
+                        raise ValueError(f"Enregistrement de chunk invalide : {path}")
 
                     records.append(value)
 
@@ -533,28 +479,21 @@ class KnowledgeBaseManager:
             return None
 
         try:
-            payload = json.loads(
-                manifest_path.read_text(encoding="utf-8")
-            )
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             records = self._read_chunk_records(chunks_path)
-            chunks = tuple(
-                DocumentChunk.model_validate(record)
-                for record in records
-            )
+            chunks = tuple(DocumentChunk.model_validate(record) for record in records)
         except Exception:
             return None
 
         if (
             not isinstance(payload, dict)
             or payload.get("status") != "success"
-            or payload.get("pipeline_version")
-            != KNOWLEDGE_BASE_PIPELINE_VERSION
+            or payload.get("pipeline_version") != KNOWLEDGE_BASE_PIPELINE_VERSION
             or payload.get("document_sha256") != entry.sha256
             or payload.get("filename") != entry.filename
             or not chunks
             or any(
-                chunk.document_id != entry.document_id
-                or chunk.source_file != entry.filename
+                chunk.document_id != entry.document_id or chunk.source_file != entry.filename
                 for chunk in chunks
             )
         ):
@@ -567,9 +506,7 @@ class KnowledgeBaseManager:
             page_count=int(payload["page_count"]),
             empty_pages=tuple(payload.get("empty_pages", [])),
             chunks=chunks,
-            duplicates_removed=int(
-                payload.get("duplicates_removed", 0)
-            ),
+            duplicates_removed=int(payload.get("duplicates_removed", 0)),
             ingestion_date=str(payload["ingestion_date"]),
             cache_directory=cache,
         )
@@ -578,9 +515,7 @@ class KnowledgeBaseManager:
         self,
         entry: ScannedPDF,
     ) -> ProcessedDocument | None:
-        legacy_source = (
-            self.project_root / "data" / "raw" / "public" / entry.filename
-        )
+        legacy_source = self.project_root / "data" / "raw" / "public" / entry.filename
         legacy_chunks = (
             self.project_root
             / "data"
@@ -602,8 +537,7 @@ class KnowledgeBaseManager:
         )
 
         if not chunks or any(
-            chunk.document_id != entry.document_id
-            or chunk.source_file != entry.filename
+            chunk.document_id != entry.document_id or chunk.source_file != entry.filename
             for chunk in chunks
         ):
             return None
@@ -634,19 +568,11 @@ class KnowledgeBaseManager:
                 previous = page
                 continue
 
-            ranges.append(
-                str(start)
-                if start == previous
-                else f"{start}-{previous}"
-            )
+            ranges.append(str(start) if start == previous else f"{start}-{previous}")
             start = page
             previous = page
 
-        ranges.append(
-            str(start)
-            if start == previous
-            else f"{start}-{previous}"
-        )
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
         return ", ".join(ranges)
 
     def _load_renamed_cached_document(
@@ -660,21 +586,16 @@ class KnowledgeBaseManager:
         if not manifests_root.is_dir():
             return None
 
-        for manifest_path in manifests_root.glob(
-            "*/*/manifest.json"
-        ):
+        for manifest_path in manifests_root.glob("*/*/manifest.json"):
             try:
-                payload = json.loads(
-                    manifest_path.read_text(encoding="utf-8")
-                )
+                payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
 
             if (
                 not isinstance(payload, dict)
                 or payload.get("status") != "success"
-                or payload.get("pipeline_version")
-                != KNOWLEDGE_BASE_PIPELINE_VERSION
+                or payload.get("pipeline_version") != KNOWLEDGE_BASE_PIPELINE_VERSION
                 or payload.get("document_sha256") != entry.sha256
             ):
                 continue
@@ -702,26 +623,17 @@ class KnowledgeBaseManager:
                 ]
 
                 if chunk.heading_path:
-                    context.append(
-                        "Section: "
-                        f"{' > '.join(chunk.heading_path)}"
-                    )
+                    context.append(f"Section: {' > '.join(chunk.heading_path)}")
 
-                embedding_text = (
-                    "\n".join(context) + "\n\n" + chunk.text
-                )
+                embedding_text = "\n".join(context) + "\n\n" + chunk.text
                 digest_input = (
-                    f"{entry.document_id}|{chunk.chunk_index}|"
-                    f"{pages}|{chunk.text}"
+                    f"{entry.document_id}|{chunk.chunk_index}|{pages}|{chunk.text}"
                 ).encode()
                 digest = hashlib.sha256(digest_input).hexdigest()[:12]
                 migrated_chunks.append(
                     chunk.model_copy(
                         update={
-                            "chunk_id": (
-                                f"{entry.document_id}_"
-                                f"{chunk.chunk_index:06d}_{digest}"
-                            ),
+                            "chunk_id": (f"{entry.document_id}_{chunk.chunk_index:06d}_{digest}"),
                             "document_id": entry.document_id,
                             "source_file": entry.filename,
                             "embedding_text": embedding_text,
@@ -741,9 +653,7 @@ class KnowledgeBaseManager:
                 page_count=int(payload["page_count"]),
                 empty_pages=tuple(payload.get("empty_pages", [])),
                 chunks=tuple(migrated_chunks),
-                duplicates_removed=int(
-                    payload.get("duplicates_removed", 0)
-                ),
+                duplicates_removed=int(payload.get("duplicates_removed", 0)),
                 ingestion_date=datetime.now(UTC).isoformat(),
                 cache_directory=self._cache_directory(
                     entry.document_id,
@@ -770,9 +680,7 @@ class KnowledgeBaseManager:
             newline="\n",
         ) as output:
             for record in document.metadata_records():
-                output.write(
-                    json.dumps(record, ensure_ascii=False) + "\n"
-                )
+                output.write(json.dumps(record, ensure_ascii=False) + "\n")
 
         os.replace(chunks_temporary, chunks_path)
         source_temporary = cache / "source.pdf.tmp"
@@ -807,9 +715,7 @@ class KnowledgeBaseManager:
 
         if cached is not None:
             if verbose:
-                print(
-                    f"Statut : cache valide ({cached.chunk_count} chunks)"
-                )
+                print(f"Statut : cache valide ({cached.chunk_count} chunks)")
             return cached
 
         legacy = self._load_legacy_document(entry)
@@ -821,10 +727,7 @@ class KnowledgeBaseManager:
             )
 
             if verbose:
-                print(
-                    "Migration du corpus existant validé : "
-                    f"{legacy.chunk_count} chunks"
-                )
+                print(f"Migration du corpus existant validé : {legacy.chunk_count} chunks")
 
             return legacy
 
@@ -837,10 +740,7 @@ class KnowledgeBaseManager:
             )
 
             if verbose:
-                print(
-                    "Cache de contenu renommé réutilisé : "
-                    f"{renamed.chunk_count} chunks"
-                )
+                print(f"Cache de contenu renommé réutilisé : {renamed.chunk_count} chunks")
 
             return renamed
 
@@ -864,10 +764,9 @@ class KnowledgeBaseManager:
         candidate = base
         counter = 1
 
-        while (
-            (self.paths.versions / candidate).exists()
-            or (self.paths.versions / f"{candidate}_tmp").exists()
-        ):
+        while (self.paths.versions / candidate).exists() or (
+            self.paths.versions / f"{candidate}_tmp"
+        ).exists():
             candidate = f"{base}_{counter:02d}"
             counter += 1
 
@@ -883,9 +782,7 @@ class KnowledgeBaseManager:
         version_directory = self.paths.versions / version
 
         try:
-            path_value = version_directory.relative_to(
-                self.project_root
-            ).as_posix()
+            path_value = version_directory.relative_to(self.project_root).as_posix()
         except ValueError:
             path_value = str(version_directory)
 
@@ -910,9 +807,7 @@ class KnowledgeBaseManager:
 
     @staticmethod
     def _atomic_write_bytes(path: Path, content: bytes) -> None:
-        temporary = path.with_name(
-            f".{path.name}.{uuid4().hex}.tmp"
-        )
+        temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
         temporary.write_bytes(content)
 
         for attempt in range(3):
@@ -940,9 +835,7 @@ class KnowledgeBaseManager:
         resolved = path.resolve()
 
         if resolved.parent != self.paths.versions.resolve():
-            raise KnowledgeBaseSyncError(
-                f"Refus de supprimer un chemin hors versions : {resolved}"
-            )
+            raise KnowledgeBaseSyncError(f"Refus de supprimer un chemin hors versions : {resolved}")
 
         if resolved.exists():
             shutil.rmtree(resolved)
@@ -970,9 +863,7 @@ class KnowledgeBaseManager:
                     time.sleep(0.1)
 
         if final_version.exists():
-            raise FileExistsError(
-                f"La version finale existe déjà : {final_version}"
-            )
+            raise FileExistsError(f"La version finale existe déjà : {final_version}")
 
         try:
             shutil.copytree(temporary_version, final_version)
@@ -989,9 +880,7 @@ class KnowledgeBaseManager:
             }
 
             if temporary_files != final_files:
-                raise KnowledgeBaseSyncError(
-                    "La copie Windows de la version est incomplète."
-                )
+                raise KnowledgeBaseSyncError("La copie Windows de la version est incomplète.")
 
             shutil.rmtree(temporary_version)
         except Exception:
@@ -1019,10 +908,7 @@ class KnowledgeBaseManager:
             target = self.paths.rejected / entry.filename
 
             if target.exists():
-                target = (
-                    self.paths.rejected
-                    / f"{Path(entry.filename).stem}_{entry.sha256[:8]}.pdf"
-                )
+                target = self.paths.rejected / f"{Path(entry.filename).stem}_{entry.sha256[:8]}.pdf"
 
             entry.path.replace(target)
             moved.append(target.name)
@@ -1034,10 +920,7 @@ class KnowledgeBaseManager:
         plan: SyncPlan,
     ) -> list[str]:
         archived: list[str] = []
-        retired = {
-            (document.filename, document.sha256): document
-            for document in plan.removed
-        }
+        retired = {(document.filename, document.sha256): document for document in plan.removed}
 
         for entry in plan.entries:
             if entry.status != "modified":
@@ -1067,9 +950,7 @@ class KnowledgeBaseManager:
                     continue
 
                 target = (
-                    self.paths.archive
-                    / f"{Path(document.filename).stem}_"
-                    f"{document.sha256[:8]}.pdf"
+                    self.paths.archive / f"{Path(document.filename).stem}_{document.sha256[:8]}.pdf"
                 )
 
             shutil.copy2(cached_source, target)
@@ -1095,9 +976,7 @@ class KnowledgeBaseManager:
                     entry.error
                     if entry.status == "invalid"
                     else (
-                        f"Doublon de {entry.duplicate_of}"
-                        if entry.status == "duplicate"
-                        else None
+                        f"Doublon de {entry.duplicate_of}" if entry.status == "duplicate" else None
                     )
                 ),
             )
@@ -1133,9 +1012,7 @@ class KnowledgeBaseManager:
             "archived": list(result.archived),
             "rejected": list(result.rejected),
         }
-        report_path = (
-            self.paths.processed / f"sync_{run_id}.json"
-        )
+        report_path = self.paths.processed / f"sync_{run_id}.json"
         report_path.write_text(
             json.dumps(report, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -1159,9 +1036,7 @@ class KnowledgeBaseManager:
                 changed=False,
                 dry_run=True,
                 version=current.version if current else None,
-                document_count=(
-                    current.document_count if current else 0
-                ),
+                document_count=(current.document_count if current else 0),
                 chunk_count=current.chunk_count if current else 0,
                 documents=tuple(plan.previous_active.values()),
                 archived=(),
@@ -1171,14 +1046,8 @@ class KnowledgeBaseManager:
 
         self.paths.create()
         current = self._current_optional()
-        needs_version = (
-            rebuild
-            or current is None
-            or plan.changes_require_rebuild
-        )
-        run_id = datetime.now(UTC).strftime(
-            "%Y%m%dT%H%M%S%fZ"
-        )
+        needs_version = rebuild or current is None or plan.changes_require_rebuild
+        run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
         version = self._new_version_name() if needs_version else None
         self.manifest.start_run(
             run_id,
@@ -1195,9 +1064,7 @@ class KnowledgeBaseManager:
             self.manifest.record_observations(observations)
 
         if not needs_version:
-            documents = tuple(
-                self.manifest.active_documents().values()
-            )
+            documents = tuple(self.manifest.active_documents().values())
             result = SyncResult(
                 changed=False,
                 dry_run=False,
@@ -1220,10 +1087,7 @@ class KnowledgeBaseManager:
             return result
 
         if not plan.active_entries:
-            error = (
-                "La base active ne peut pas être vide. "
-                "Ajoutez au moins un PDF valide."
-            )
+            error = "La base active ne peut pas être vide. Ajoutez au moins un PDF valide."
             self.manifest.finish_run(
                 run_id,
                 status="failed",
@@ -1232,14 +1096,10 @@ class KnowledgeBaseManager:
             raise KnowledgeBaseSyncError(error)
 
         assert version is not None
-        temporary_version = (
-            self.paths.versions / f"{version}_tmp"
-        )
+        temporary_version = self.paths.versions / f"{version}_tmp"
         final_version = self.paths.versions / version
         previous_pointer = (
-            self.paths.current_index.read_bytes()
-            if self.paths.current_index.is_file()
-            else None
+            self.paths.current_index.read_bytes() if self.paths.current_index.is_file() else None
         )
         pointer_activated = False
 
@@ -1250,10 +1110,7 @@ class KnowledgeBaseManager:
                 plan.active_entries,
                 start=1,
             ):
-                print(
-                    f"\n[{position}/{len(plan.active_entries)}] "
-                    f"{entry.filename}"
-                )
+                print(f"\n[{position}/{len(plan.active_entries)}] {entry.filename}")
                 print(f"Statut : {entry.status}")
                 document = self._prepare_document(
                     entry,
@@ -1262,10 +1119,7 @@ class KnowledgeBaseManager:
                 prepared_documents.append(document)
                 print(f"Pages : {document.page_count}")
                 print(f"Chunks : {document.chunk_count}")
-                print(
-                    "Doublons ignorés : "
-                    f"{document.duplicates_removed}"
-                )
+                print(f"Doublons ignorés : {document.duplicates_removed}")
 
             records = [
                 record
@@ -1283,18 +1137,14 @@ class KnowledgeBaseManager:
                 records=records,
                 version_directory=temporary_version,
                 previous_version_directory=(
-                    current.version_directory
-                    if current is not None
-                    else None
+                    current.version_directory if current is not None else None
                 ),
             )
             expected_active_files = {
-                (entry.filename, entry.sha256)
-                for entry in plan.active_entries
+                (entry.filename, entry.sha256) for entry in plan.active_entries
             }
             current_active_files = {
-                (entry.filename, entry.sha256)
-                for entry in self.scan().active_entries
+                (entry.filename, entry.sha256) for entry in self.scan().active_entries
             }
 
             if current_active_files != expected_active_files:
@@ -1335,8 +1185,7 @@ class KnowledgeBaseManager:
             self._activate_pointer(pointer)
             pointer_activated = True
             retired_statuses = {
-                (document.filename, document.sha256): "removed"
-                for document in plan.removed
+                (document.filename, document.sha256): "removed" for document in plan.removed
             }
 
             for entry in plan.entries:
@@ -1346,9 +1195,7 @@ class KnowledgeBaseManager:
                 previous = plan.previous_active.get(entry.filename)
 
                 if previous is not None:
-                    retired_statuses[
-                        (previous.filename, previous.sha256)
-                    ] = "superseded"
+                    retired_statuses[(previous.filename, previous.sha256)] = "superseded"
 
             self.manifest.activate_documents(
                 documents,
@@ -1377,12 +1224,8 @@ class KnowledgeBaseManager:
                     **plan.summary,
                     "document_count": len(documents),
                     "chunk_count": build.chunk_count,
-                    "embedded_chunk_count": (
-                        build.embedded_chunk_count
-                    ),
-                    "reused_embedding_count": (
-                        build.reused_embedding_count
-                    ),
+                    "embedded_chunk_count": (build.embedded_chunk_count),
+                    "reused_embedding_count": (build.reused_embedding_count),
                 },
             )
             self._write_run_report(run_id=run_id, result=result)
@@ -1402,8 +1245,7 @@ class KnowledgeBaseManager:
                 error=f"{type(error).__name__}: {error}",
             )
             raise KnowledgeBaseSyncError(
-                "La synchronisation a échoué ; l'ancien index actif "
-                "a été conservé."
+                "La synchronisation a échoué ; l'ancien index actif a été conservé."
             ) from error
 
     def list_active(self) -> tuple[ManifestDocument, ...]:
@@ -1419,9 +1261,7 @@ class KnowledgeBaseManager:
 
         for document in documents:
             print(
-                f"- {document.filename} | "
-                f"chunks={document.chunk_count} | "
-                f"sha256={document.sha256}"
+                f"- {document.filename} | chunks={document.chunk_count} | sha256={document.sha256}"
             )
 
         return documents
@@ -1446,11 +1286,7 @@ class KnowledgeBaseManager:
             print(f"Chemin : {current.version_directory}")
 
         if latest_run is not None:
-            print(
-                "Dernière synchronisation : "
-                f"{latest_run['status']} "
-                f"({latest_run['run_id']})"
-            )
+            print(f"Dernière synchronisation : {latest_run['status']} ({latest_run['run_id']})")
 
         return {
             "current": current,

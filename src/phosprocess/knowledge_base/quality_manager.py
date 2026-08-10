@@ -101,9 +101,7 @@ def _publish_directory(temporary: Path, final: Path) -> None:
         }
 
         if source_files != final_files:
-            raise QualityKnowledgeBaseError(
-                "La publication Windows de l'index est incomplète."
-            )
+            raise QualityKnowledgeBaseError("La publication Windows de l'index est incomplète.")
 
         shutil.rmtree(temporary)
     except Exception:
@@ -135,9 +133,7 @@ class QualityKnowledgeBaseManager:
         )
         self.index_builder = index_builder or QualityIndexBuilder(
             VersionIndexBuilder(
-                embedding_config_path=self.project_root
-                / "configs"
-                / "embeddings.yaml",
+                embedding_config_path=self.project_root / "configs" / "embeddings.yaml",
                 retrieval_config_path=self.project_root
                 / "data"
                 / "evaluation"
@@ -146,23 +142,15 @@ class QualityKnowledgeBaseManager:
                 / "frozen"
                 / "dev_best_v3"
                 / "retrieval_v2.yaml",
-                embedding_cache_path=self.root
-                / "processed"
-                / "embedding_cache.sqlite",
+                embedding_cache_path=self.root / "processed" / "embedding_cache.sqlite",
             )
         )
 
     def _verified_active_documents(self) -> tuple[Any, ...]:
         if len(self.catalog.documents) != 8:
-            raise QualityKnowledgeBaseError(
-                "Le catalogue doit contenir exactement huit documents."
-            )
+            raise QualityKnowledgeBaseError("Le catalogue doit contenir exactement huit documents.")
 
-        inactive = [
-            entry.document_id
-            for entry in self.catalog.documents
-            if not entry.active
-        ]
+        inactive = [entry.document_id for entry in self.catalog.documents if not entry.active]
 
         if inactive:
             raise QualityKnowledgeBaseError(
@@ -181,8 +169,7 @@ class QualityKnowledgeBaseManager:
 
         if invalid:
             details = ", ".join(
-                f"{document_id}={reason}"
-                for document_id, reason in sorted(invalid.items())
+                f"{document_id}={reason}" for document_id, reason in sorted(invalid.items())
             )
             raise QualityKnowledgeBaseError(
                 f"Le corpus physique ne correspond pas au catalogue : {details}"
@@ -224,10 +211,7 @@ class QualityKnowledgeBaseManager:
         if manifest.get("pipeline_version") != QUALITY_INDEX_PIPELINE_VERSION:
             return False
 
-        expected = {
-            entry.document_id: entry.sha256
-            for entry in self.catalog.documents
-        }
+        expected = {entry.document_id: entry.sha256 for entry in self.catalog.documents}
         observed = {
             str(document.get("document_id")): str(document.get("sha256"))
             for document in current.documents
@@ -239,10 +223,7 @@ class QualityKnowledgeBaseManager:
         candidate = base
         suffix = 1
 
-        while (
-            (self.versions / candidate).exists()
-            or (self.versions / f"{candidate}_tmp").exists()
-        ):
+        while (self.versions / candidate).exists() or (self.versions / f"{candidate}_tmp").exists():
             candidate = f"{base}_{suffix:02d}"
             suffix += 1
 
@@ -259,9 +240,7 @@ class QualityKnowledgeBaseManager:
         version_directory = self.versions / version
 
         try:
-            path_value = version_directory.relative_to(
-                self.project_root
-            ).as_posix()
+            path_value = version_directory.relative_to(self.project_root).as_posix()
         except ValueError:
             path_value = str(version_directory)
 
@@ -306,8 +285,7 @@ class QualityKnowledgeBaseManager:
                     else ""
                 )
                 print(
-                    f"- {entry.source_filename} | {entry.page_count} pages | "
-                    f"SHA vérifié{warning}"
+                    f"- {entry.source_filename} | {entry.page_count} pages | SHA vérifié{warning}"
                 )
 
         if dry_run:
@@ -356,34 +334,17 @@ class QualityKnowledgeBaseManager:
         try:
             for entry in entries:
                 if verbose:
-                    print(
-                        "Préparation Docling/chunking : "
-                        f"{entry.source_filename}"
-                    )
+                    print(f"Préparation Docling/chunking : {entry.source_filename}")
 
                 prepared.append(self.corpus_processor.prepare(entry))
         except Exception as error:
             raise QualityKnowledgeBaseError(
-                "La préparation structurée a échoué ; "
-                "l'ancien index reste actif."
+                "La préparation structurée a échoué ; l'ancien index reste actif."
             ) from error
 
-        children = [
-            child
-            for document in prepared
-            for child in document.children
-            if child.active
-        ]
-        parents = [
-            parent
-            for document in prepared
-            for parent in document.parents
-        ]
-        sections = [
-            section
-            for document in prepared
-            for section in document.sections
-        ]
+        children = [child for document in prepared for child in document.children if child.active]
+        parents = [parent for document in prepared for parent in document.parents]
+        sections = [section for document in prepared for section in document.sections]
         documents = tuple(
             QualityDocumentResult(
                 filename=document.entry.source_filename,
@@ -462,9 +423,6 @@ class QualityKnowledgeBaseManager:
         print(f"Documents actifs : {len(entries)}")
 
         for entry in entries:
-            print(
-                f"- {entry.source_filename} | pages={entry.page_count} | "
-                f"sha256={entry.sha256}"
-            )
+            print(f"- {entry.source_filename} | pages={entry.page_count} | sha256={entry.sha256}")
 
         return entries

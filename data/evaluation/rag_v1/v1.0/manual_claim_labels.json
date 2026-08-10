@@ -1,0 +1,1478 @@
+{
+  "CE051": [
+    {
+      "label": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED"
+    }
+  ],
+  "CE052": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE054": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE055": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "CE056": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE057": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE060": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE061": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE062": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE065": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE066": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ001": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ003": [
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ004": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ005": [
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ006": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ007": [
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ008": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ009": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ010": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ011": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ012": [
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ014": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ016": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ017": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ018": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ019": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ020": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ021": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ023": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ024": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ029": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ030": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ033": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ034": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ035": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ038": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ039": [
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ040": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ041": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ043": [
+    {
+      "label": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ044": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ045": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ048": [
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ049": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "ABS_DQ050": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "ABS_CE058": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "ABS_CE059": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "PROCESS_FLOW_ACCEPTANCE": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CONV02_T2_DQ021": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "CONV04_T2_DQ044": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CONV06_T2_DQ049": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE053": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE063": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE064": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CE067": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ002": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ013": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ015": [
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ022": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ025": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ026": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ027": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ028": [
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ031": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ032": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ036": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ037": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ042": [
+    {
+      "label": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "DQ046": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "DQ047": [
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CONV01_T2_DQ002": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CONV01_T3_DQ003": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "UNSUPPORTED",
+      "citation_support": "UNSUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    }
+  ],
+  "CONV03_T2_DQ042": [
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED"
+    },
+    {
+      "label": "SUPPORTED"
+    },
+    {
+      "label": "PARTIALLY_SUPPORTED",
+      "citation_support": "PARTIALLY_SUPPORTED"
+    }
+  ],
+  "CONV05_T2_DQ047": [
+    {
+      "label": "SUPPORTED"
+    }
+  ]
+}

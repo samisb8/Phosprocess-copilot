@@ -1,77 +1,33 @@
-﻿from __future__ import annotations
+"""Legacy lexical expansion must not inject documentary answer content."""
+
+from __future__ import annotations
 
 import pytest
 
-from phosprocess.retrieval.hybrid import (
-    expand_lexical_query,
-)
+from phosprocess.retrieval.hybrid import expand_lexical_query
 
 
-def test_phosphoric_v1_is_preserved() -> None:
-    query = "Quel est le rapport de recirculation externe ?"
+@pytest.mark.parametrize("version", ["phosphoric_v1", "phosphoric_v2"])
+def test_legacy_domain_versions_are_safe_passthroughs(version: str) -> None:
+    query = "Quelles informations documentaires répondent à cette question ?"
+    assert expand_lexical_query(query, version=version) == query
 
+
+def test_legacy_expansion_does_not_inject_expected_answer_facts() -> None:
     expanded = expand_lexical_query(
-        query,
-        version="phosphoric_v1",
-    )
-
-    assert "external recirculation ratio" in expanded
-    assert "sludge removal losses" not in expanded
-
-
-def test_phosphoric_v2_expands_p2o5_losses() -> None:
-    query = (
-        "Quelles categories de pertes de P2O5 "
-        "doivent etre prises en compte ?"
-    )
-
-    expanded = expand_lexical_query(
-        query,
+        "Décris le trajet et les pertes documentées.",
         version="phosphoric_v2",
-    )
-
-    expected = [
-        "P2O5 losses",
-        "co-crystallized losses",
-        "lattice losses",
+    ).casefold()
+    for forbidden in (
+        "product outlet",
+        "conical bottom",
         "cake impregnation losses",
-        "unattacked P2O5",
-        "mechanical losses",
         "sludge removal losses",
-    ]
-
-    for phrase in expected:
-        assert phrase in expanded
-
-
-def test_phosphoric_v2_expands_intermediate_clarification() -> None:
-    query = (
-        "Pourquoi une clarification interm\u00e9diaire "
-        "vers 40 % P2O5 est-elle preferable ?"
-    )
-
-    expanded = expand_lexical_query(
-        query,
-        version="phosphoric_v2",
-    )
-
-    expected = [
-        "intermediate clearing",
-        "intermediate clarification",
-        "intermediate settling",
-        "40% P2O5",
-    ]
-
-    for phrase in expected:
-        assert phrase in expanded
+        "40% p2o5",
+    ):
+        assert forbidden not in expanded
 
 
 def test_unknown_version_is_rejected() -> None:
-    with pytest.raises(
-        ValueError,
-        match="Version d'expansion inconnue",
-    ):
-        expand_lexical_query(
-            "test",
-            version="unknown",
-        )
+    with pytest.raises(ValueError, match="Version d'expansion inconnue"):
+        expand_lexical_query("test", version="unknown")

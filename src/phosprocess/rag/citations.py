@@ -5,20 +5,13 @@ from __future__ import annotations
 import re
 
 INSUFFICIENT_CONTEXT_ANSWER = (
-    "Les passages retrouvés ne permettent pas de répondre précisément "
-    "à cette question."
+    "Les passages retrouvés ne permettent pas de répondre précisément à cette question."
 )
 INSUFFICIENT_CONTEXT_ANSWERS = {
     INSUFFICIENT_CONTEXT_ANSWER,
-    (
-        "The retrieved passages do not provide enough information to answer "
-        "this question precisely."
-    ),
+    ("The retrieved passages do not provide enough information to answer this question precisely."),
     "لا توفر المقاطع المسترجعة معلومات كافية للإجابة عن هذا السؤال بدقة.",
-    (
-        "Les documents fournis ne permettent pas de répondre précisément "
-        "à cette question."
-    ),
+    ("Les documents fournis ne permettent pas de répondre précisément à cette question."),
 }
 _EXACT_CITATION_PATTERN = re.compile(r"\[Source ([1-9]\d*)\]")
 _BRACKETED_SOURCE_PATTERN = re.compile(
@@ -56,10 +49,7 @@ class CitationValidationError(ValueError):
 def _numbers_from_reference(reference: str) -> list[int]:
     """Extract diagnostic numbers from one malformed reference."""
 
-    return [
-        int(match.group(1))
-        for match in _ANY_SOURCE_NUMBER_PATTERN.finditer(reference)
-    ]
+    return [int(match.group(1)) for match in _ANY_SOURCE_NUMBER_PATTERN.finditer(reference)]
 
 
 def extract_citations(
@@ -71,24 +61,6 @@ def extract_citations(
 
     if available_source_count < 0:
         raise ValueError("available_source_count ne peut pas être négatif.")
-
-    normalized_answer = _WHITESPACE.sub(" ", answer).strip()
-
-    for insufficient_answer in INSUFFICIENT_CONTEXT_ANSWERS:
-        normalized_insufficient = _WHITESPACE.sub(
-            " ",
-            insufficient_answer,
-        ).strip()
-
-        if (
-            normalized_insufficient in normalized_answer
-            and normalized_answer != normalized_insufficient
-        ):
-            raise CitationValidationError(
-                "La formulation d'insuffisance doit constituer toute la "
-                "réponse et ne peut pas être mélangée à une réponse "
-                "affirmative."
-            )
 
     exact_matches = list(_EXACT_CITATION_PATTERN.finditer(answer))
     detected = [int(match.group(1)) for match in exact_matches]
@@ -106,8 +78,7 @@ def extract_citations(
         if _EXACT_CITATION_PATTERN.fullmatch(reference) is None:
             malformed_numbers = _numbers_from_reference(reference)
             raise CitationValidationError(
-                f"Format de citation non autorisé : {reference!r}. "
-                "Utilisez exactement [Source N].",
+                f"Format de citation non autorisé : {reference!r}. Utilisez exactement [Source N].",
                 detected_citations=detected + malformed_numbers,
             )
 
@@ -118,10 +89,7 @@ def extract_citations(
             f"Format de citation non autorisé : "
             f"{malformed_unbracketed.group(0)!r}. "
             "Utilisez exactement [Source N].",
-            detected_citations=(
-                detected
-                + _numbers_from_reference(malformed_unbracketed.group(0))
-            ),
+            detected_citations=(detected + _numbers_from_reference(malformed_unbracketed.group(0))),
         )
 
     citations: list[int] = []

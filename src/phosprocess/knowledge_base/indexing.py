@@ -60,6 +60,7 @@ from phosprocess.retrieval.hybrid import HybridRetriever
 
 SMOKE_QUERY = "procédé phosphorique filtration gypse concentration"
 
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
 
@@ -74,9 +75,7 @@ def load_chunking_config(path: Path) -> ChunkingConfig:
 
     raw = _load_yaml(path)
     return ChunkingConfig(
-        tokenizer_name=resolve_cached_model_source(
-            str(raw["tokenizer_name"])
-        ),
+        tokenizer_name=resolve_cached_model_source(str(raw["tokenizer_name"])),
         target_tokens=int(raw["target_tokens"]),
         max_tokens=int(raw["max_tokens"]),
         overlap_tokens=int(raw["overlap_tokens"]),
@@ -98,15 +97,9 @@ def load_postprocessing_config(
         restore_uncovered_pages=bool(raw["restore_uncovered_pages"]),
         min_chunk_tokens=int(raw["min_chunk_tokens"]),
         max_tokens=int(raw["max_tokens"]),
-        boilerplate_min_occurrences=int(
-            raw["boilerplate_min_occurrences"]
-        ),
-        boilerplate_min_fraction=float(
-            raw["boilerplate_min_fraction"]
-        ),
-        boilerplate_max_line_characters=int(
-            raw["boilerplate_max_line_characters"]
-        ),
+        boilerplate_min_occurrences=int(raw["boilerplate_min_occurrences"]),
+        boilerplate_min_fraction=float(raw["boilerplate_min_fraction"]),
+        boilerplate_max_line_characters=int(raw["boilerplate_max_line_characters"]),
         fallback_overlap_tokens=int(raw["fallback_overlap_tokens"]),
     )
 
@@ -120,13 +113,9 @@ class ProductionDocumentProcessor:
         chunking_config_path: Path,
         postprocessing_config_path: Path,
     ) -> None:
-        self.chunker = StructureAwareChunker(
-            load_chunking_config(chunking_config_path)
-        )
+        self.chunker = StructureAwareChunker(load_chunking_config(chunking_config_path))
         self.postprocessor = ChunkPostprocessor(
-            config=load_postprocessing_config(
-                postprocessing_config_path
-            ),
+            config=load_postprocessing_config(postprocessing_config_path),
             token_counter=self.chunker,
         )
 
@@ -210,11 +199,7 @@ class ProductionDocumentProcessor:
                     word_count=len(page.text.split()),
                     is_empty=page.is_empty,
                     needs_review=page.is_empty,
-                    warnings=(
-                        ["empty_page"]
-                        if page.is_empty
-                        else []
-                    ),
+                    warnings=(["empty_page"] if page.is_empty else []),
                 ),
             )
             for page in extracted_pages
@@ -228,38 +213,24 @@ class ProductionDocumentProcessor:
         if not pages:
             raise ValueError(f"Le PDF ne contient aucune page : {pdf_path}")
 
-        raw_chunks = [
-            chunk
-            for chunk in self.chunker.chunk_document(pages)
-            if chunk.text.strip()
-        ]
+        raw_chunks = [chunk for chunk in self.chunker.chunk_document(pages) if chunk.text.strip()]
 
         if not raw_chunks:
-            raise ValueError(
-                f"Aucun chunk exploitable extrait de {pdf_path.name}."
-            )
+            raise ValueError(f"Aucun chunk exploitable extrait de {pdf_path.name}.")
 
         result = self.postprocessor.process(
             chunks=raw_chunks,
             pages=pages,
         )
-        chunks = tuple(
-            chunk
-            for chunk in result.chunks
-            if chunk.text.strip()
-        )
+        chunks = tuple(chunk for chunk in result.chunks if chunk.text.strip())
 
         if not chunks:
-            raise ValueError(
-                f"Aucun chunk final exploitable pour {pdf_path.name}."
-            )
+            raise ValueError(f"Aucun chunk final exploitable pour {pdf_path.name}.")
 
         chunk_ids = [chunk.chunk_id for chunk in chunks]
 
         if len(chunk_ids) != len(set(chunk_ids)):
-            raise ValueError(
-                f"chunk_id dupliqué dans {pdf_path.name}."
-            )
+            raise ValueError(f"chunk_id dupliqué dans {pdf_path.name}.")
 
         return ProcessedDocument(
             filename=pdf_path.name,
@@ -267,14 +238,10 @@ class ProductionDocumentProcessor:
             document_sha256=document_sha256,
             page_count=len(pages),
             empty_pages=tuple(
-                page.provenance.page_number
-                for page in pages
-                if page.quality.is_empty
+                page.provenance.page_number for page in pages if page.quality.is_empty
             ),
             chunks=chunks,
-            duplicates_removed=int(
-                result.statistics["duplicates_removed"]
-            ),
+            duplicates_removed=int(result.statistics["duplicates_removed"]),
             ingestion_date=datetime.now(UTC).isoformat(),
             cache_directory=cache_directory,
         )
@@ -288,39 +255,27 @@ class VersionIndexBuilder:
         *,
         embedding_config_path: Path,
         retrieval_config_path: Path,
-        embedder_factory: (
-            Callable[[EmbeddingConfig], Any] | None
-        ) = None,
+        embedder_factory: (Callable[[EmbeddingConfig], Any] | None) = None,
         runtime_validation: bool = True,
         legacy_dense_directory: Path | None = None,
         embedding_cache_path: Path | None = None,
     ) -> None:
         self.embedding_config_path = embedding_config_path.resolve()
         self.retrieval_config_path = retrieval_config_path.resolve()
-        self.embedding_config = load_embedding_config(
-            self.embedding_config_path
-        )
-        self.bm25_config = load_bm25_config(
-            self.retrieval_config_path
-        )
+        self.embedding_config = load_embedding_config(self.embedding_config_path)
+        self.bm25_config = load_bm25_config(self.retrieval_config_path)
         self.embedder_factory = embedder_factory or BGEEmbedder
         self.runtime_validation = runtime_validation
         self.legacy_dense_directory = (
-            legacy_dense_directory.resolve()
-            if legacy_dense_directory is not None
-            else None
+            legacy_dense_directory.resolve() if legacy_dense_directory is not None else None
         )
         self.embedding_cache_path = (
-            embedding_cache_path.resolve()
-            if embedding_cache_path is not None
-            else None
+            embedding_cache_path.resolve() if embedding_cache_path is not None else None
         )
 
     @staticmethod
     def _embedding_cache_key(record: dict[str, Any]) -> str:
-        return hashlib.sha256(
-            str(record["embedding_text"]).encode("utf-8")
-        ).hexdigest()
+        return hashlib.sha256(str(record["embedding_text"]).encode("utf-8")).hexdigest()
 
     def _load_persistent_vector_cache(
         self,
@@ -348,9 +303,7 @@ class VersionIndexBuilder:
         for cache_key, blob in rows:
             vector = np.frombuffer(blob, dtype=np.float32).copy()
 
-            if vector.shape == (
-                self.embedding_config.embedding_dimension,
-            ):
+            if vector.shape == (self.embedding_config.embedding_dimension,):
                 cache[str(cache_key)] = vector
 
         return cache
@@ -409,16 +362,12 @@ class VersionIndexBuilder:
         with path.open("r", encoding="utf-8") as source:
             for line_number, line in enumerate(source, start=1):
                 if not line.strip():
-                    raise ValueError(
-                        f"{path.name}, ligne {line_number} vide."
-                    )
+                    raise ValueError(f"{path.name}, ligne {line_number} vide.")
 
                 value = json.loads(line)
 
                 if not isinstance(value, dict):
-                    raise ValueError(
-                        f"{path.name}, ligne {line_number} invalide."
-                    )
+                    raise ValueError(f"{path.name}, ligne {line_number} invalide.")
 
                 records.append(value)
 
@@ -477,8 +426,7 @@ class VersionIndexBuilder:
 
         if (
             int(index.ntotal) != len(records)
-            or int(index.d)
-            != self.embedding_config.embedding_dimension
+            or int(index.d) != self.embedding_config.embedding_dimension
         ):
             return {}
 
@@ -497,9 +445,7 @@ class VersionIndexBuilder:
         *,
         previous_version_directory: Path | None,
     ) -> tuple[np.ndarray, int, int]:
-        current_cache = self._load_vector_cache(
-            previous_version_directory
-        )
+        current_cache = self._load_vector_cache(previous_version_directory)
         legacy_cache = self._load_legacy_vector_cache()
         persistent_cache = self._load_persistent_vector_cache()
         dimension = self.embedding_config.embedding_dimension
@@ -517,27 +463,19 @@ class VersionIndexBuilder:
             )
             cached = current_cache.get(key)
 
-            if (
-                cached is not None
-                and cached[0] == record["embedding_text"]
-            ):
+            if cached is not None and cached[0] == record["embedding_text"]:
                 vectors[position] = cached[1]
                 reused += 1
                 continue
 
             legacy = legacy_cache.get(str(record["chunk_id"]))
 
-            if (
-                legacy is not None
-                and legacy[0] == record["embedding_text"]
-            ):
+            if legacy is not None and legacy[0] == record["embedding_text"]:
                 vectors[position] = legacy[1]
                 reused += 1
                 continue
 
-            persistent = persistent_cache.get(
-                self._embedding_cache_key(record)
-            )
+            persistent = persistent_cache.get(self._embedding_cache_key(record))
 
             if persistent is not None:
                 vectors[position] = persistent
@@ -549,16 +487,11 @@ class VersionIndexBuilder:
         if missing_positions:
             embedder = self.embedder_factory(self.embedding_config)
             new_vectors = embedder.embed_documents(
-                [
-                    str(records[position]["embedding_text"])
-                    for position in missing_positions
-                ]
+                [str(records[position]["embedding_text"]) for position in missing_positions]
             )
 
             if new_vectors.shape != (len(missing_positions), dimension):
-                raise ValueError(
-                    "Le modèle d'embeddings a retourné une forme invalide."
-                )
+                raise ValueError("Le modèle d'embeddings a retourné une forme invalide.")
 
             if self.embedding_config.normalize_embeddings:
                 new_norms = np.linalg.norm(
@@ -568,9 +501,7 @@ class VersionIndexBuilder:
                 )
 
                 if np.any(new_norms <= 0):
-                    raise ValueError(
-                        "Un nouvel embedding possède une norme nulle."
-                    )
+                    raise ValueError("Un nouvel embedding possède une norme nulle.")
 
                 new_vectors = new_vectors / new_norms
 
@@ -584,9 +515,7 @@ class VersionIndexBuilder:
             )
 
         if not np.isfinite(vectors).all():
-            raise ValueError(
-                "Les embeddings contiennent une valeur non finie."
-            )
+            raise ValueError("Les embeddings contiennent une valeur non finie.")
 
         norms = np.linalg.norm(vectors, axis=1)
 
@@ -609,9 +538,7 @@ class VersionIndexBuilder:
     ) -> None:
         with path.open("w", encoding="utf-8", newline="\n") as output:
             for record in records:
-                output.write(
-                    json.dumps(record, ensure_ascii=False) + "\n"
-                )
+                output.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     @staticmethod
     def _write_json(payload: dict[str, Any], path: Path) -> None:
@@ -631,9 +558,7 @@ class VersionIndexBuilder:
         reused_count: int,
     ) -> None:
         dense_directory.mkdir(parents=True, exist_ok=False)
-        index = faiss.IndexFlatIP(
-            self.embedding_config.embedding_dimension
-        )
+        index = faiss.IndexFlatIP(self.embedding_config.embedding_dimension)
         index.add(vectors)
         faiss.write_index(
             index,
@@ -641,10 +566,7 @@ class VersionIndexBuilder:
         )
         np.save(dense_directory / "embeddings.npy", vectors)
         self._write_jsonl(
-            (
-                {"vector_id": position, **record}
-                for position, record in enumerate(records)
-            ),
+            ({"vector_id": position, **record} for position, record in enumerate(records)),
             dense_directory / "metadata.jsonl",
         )
         self._write_json(
@@ -654,9 +576,7 @@ class VersionIndexBuilder:
                 "model": {
                     "name": self.embedding_config.model_name,
                     "dimension": self.embedding_config.embedding_dimension,
-                    "normalize_embeddings": (
-                        self.embedding_config.normalize_embeddings
-                    ),
+                    "normalize_embeddings": (self.embedding_config.normalize_embeddings),
                 },
                 "index": {
                     "library": "faiss",
@@ -686,14 +606,9 @@ class VersionIndexBuilder:
         document_counts: dict[str, int],
     ) -> None:
         bm25_directory.mkdir(parents=True, exist_ok=False)
-        chunks = [
-            DocumentChunk.model_validate(record)
-            for record in records
-        ]
+        chunks = [DocumentChunk.model_validate(record) for record in records]
         tokenized = [
-            technical_tokenize(
-                str(record.get("bm25_text") or build_lexical_text(chunk))
-            )
+            technical_tokenize(str(record.get("bm25_text") or build_lexical_text(chunk)))
             for record, chunk in zip(records, chunks, strict=True)
         ]
 
@@ -714,10 +629,7 @@ class VersionIndexBuilder:
         )
         model.save(str(bm25_directory), show_progress=False)
         self._write_jsonl(
-            (
-                {"lexical_id": position, **record}
-                for position, record in enumerate(records)
-            ),
+            ({"lexical_id": position, **record} for position, record in enumerate(records)),
             bm25_directory / self.bm25_config.metadata_filename,
         )
         self._write_json(
@@ -762,58 +674,33 @@ class VersionIndexBuilder:
     ) -> tuple[bool, bool, bool]:
         dense_directory = version_directory / "dense"
         bm25_directory = version_directory / "bm25"
-        index = faiss.read_index(
-            str(dense_directory / "index.faiss")
-        )
-        dense_records = self._read_jsonl(
-            dense_directory / "metadata.jsonl"
-        )
-        bm25_records = self._read_jsonl(
-            bm25_directory / self.bm25_config.metadata_filename
-        )
+        index = faiss.read_index(str(dense_directory / "index.faiss"))
+        dense_records = self._read_jsonl(dense_directory / "metadata.jsonl")
+        bm25_records = self._read_jsonl(bm25_directory / self.bm25_config.metadata_filename)
         embeddings = np.load(
             dense_directory / "embeddings.npy",
             allow_pickle=False,
         )
-        expected_ids = [
-            str(record["chunk_id"])
-            for record in records
-        ]
+        expected_ids = [str(record["chunk_id"]) for record in records]
 
         if (
             int(index.ntotal) != len(records)
-            or int(index.d)
-            != self.embedding_config.embedding_dimension
+            or int(index.d) != self.embedding_config.embedding_dimension
             or embeddings.shape
             != (
                 len(records),
                 self.embedding_config.embedding_dimension,
             )
-            or [
-                str(record["chunk_id"])
-                for record in dense_records
-            ]
-            != expected_ids
-            or [
-                str(record["chunk_id"])
-                for record in bm25_records
-            ]
-            != expected_ids
+            or [str(record["chunk_id"]) for record in dense_records] != expected_ids
+            or [str(record["chunk_id"]) for record in bm25_records] != expected_ids
             or len(expected_ids) != len(set(expected_ids))
         ):
-            raise ValueError(
-                "Les index et métadonnées ne correspondent pas exactement."
-            )
+            raise ValueError("Les index et métadonnées ne correspondent pas exactement.")
 
-        indexed_document_ids = {
-            str(record["document_id"])
-            for record in dense_records
-        }
+        indexed_document_ids = {str(record["document_id"]) for record in dense_records}
 
         if indexed_document_ids != active_document_ids:
-            raise ValueError(
-                "Un document inactif est présent dans les index."
-            )
+            raise ValueError("Un document inactif est présent dans les index.")
 
         query_vector = np.ascontiguousarray(
             embeddings[0].reshape(1, -1),
@@ -823,10 +710,7 @@ class VersionIndexBuilder:
             query_vector,
             min(5, len(records)),
         )
-        dense_ok = bool(
-            vector_ids.size
-            and int(vector_ids[0][0]) >= 0
-        )
+        dense_ok = bool(vector_ids.size and int(vector_ids[0][0]) >= 0)
         bm25 = BM25Retriever(
             index_directory=bm25_directory,
             config_path=self.retrieval_config_path,
@@ -856,17 +740,12 @@ class VersionIndexBuilder:
             hybrid_ok = bool(response.results)
 
             if any(
-                result.chunk.document_id not in active_document_ids
-                for result in response.results
+                result.chunk.document_id not in active_document_ids for result in response.results
             ):
-                raise ValueError(
-                    "Le retrieval hybride retourne un document inactif."
-                )
+                raise ValueError("Le retrieval hybride retourne un document inactif.")
 
         if not (dense_ok and bm25_ok and hybrid_ok):
-            raise ValueError(
-                "Une recherche de validation dense/BM25/hybride a échoué."
-            )
+            raise ValueError("Une recherche de validation dense/BM25/hybride a échoué.")
 
         del hybrid
         del bm25
@@ -884,14 +763,9 @@ class VersionIndexBuilder:
         """Build and validate one temporary immutable index version."""
 
         if not records:
-            raise ValueError(
-                "Impossible de construire une base sans chunk."
-            )
+            raise ValueError("Impossible de construire une base sans chunk.")
 
-        chunks = [
-            DocumentChunk.model_validate(record)
-            for record in records
-        ]
+        chunks = [DocumentChunk.model_validate(record) for record in records]
         chunk_ids = [chunk.chunk_id for chunk in chunks]
 
         if len(chunk_ids) != len(set(chunk_ids)):
@@ -908,9 +782,7 @@ class VersionIndexBuilder:
                 [],
             ).append(record)
 
-        for document_id, document_records in sorted(
-            records_by_document.items()
-        ):
+        for document_id, document_records in sorted(records_by_document.items()):
             self._write_jsonl(
                 document_records,
                 corpus_directory / f"{document_id}_chunks.jsonl",
@@ -920,9 +792,7 @@ class VersionIndexBuilder:
             records,
             previous_version_directory=previous_version_directory,
         )
-        document_counts = dict(
-            Counter(chunk.document_id for chunk in chunks)
-        )
+        document_counts = dict(Counter(chunk.document_id for chunk in chunks))
         self._build_dense(
             records,
             vectors,
@@ -952,9 +822,7 @@ class VersionIndexBuilder:
                 "validation": {
                     "faiss_readable": True,
                     "bm25_readable": True,
-                    "embedding_dimension": (
-                        self.embedding_config.embedding_dimension
-                    ),
+                    "embedding_dimension": (self.embedding_config.embedding_dimension),
                     "vector_chunk_alignment": True,
                     "unique_chunk_ids": True,
                     "inactive_documents_absent": True,

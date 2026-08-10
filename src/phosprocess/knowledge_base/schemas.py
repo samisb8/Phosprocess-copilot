@@ -46,6 +46,7 @@ class DocumentCatalogEntry(BaseModel):
     canonical_filename: str = Field(pattern=r"(?i)^.+\.pdf$")
     source_filename: str = Field(pattern=r"(?i)^.+\.pdf$")
     display_title: str = Field(min_length=1)
+    aliases: tuple[str, ...] = Field(min_length=1)
     authors: tuple[str, ...] = Field(min_length=1)
     edition: str = Field(min_length=1)
     language: str = Field(pattern=r"^(?:en|fr|ar|multilingual)$")
@@ -70,7 +71,7 @@ class DocumentCatalogEntry(BaseModel):
 
         return normalized
 
-    @field_validator("authors", "subdomains")
+    @field_validator("aliases", "authors", "subdomains")
     @classmethod
     def validate_unique_non_empty_values(
         cls,
@@ -85,6 +86,13 @@ class DocumentCatalogEntry(BaseModel):
             raise ValueError("Le catalogue contient une valeur dupliquée.")
 
         return normalized
+
+    @field_validator("aliases")
+    @classmethod
+    def validate_primary_alias(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if re.fullmatch(r"[a-z][a-z0-9_]*", values[0]) is None:
+            raise ValueError("Le premier alias doit être un identifiant de mode stable.")
+        return values
 
     @field_validator("domains")
     @classmethod
@@ -121,5 +129,9 @@ class KnowledgeBaseCatalog(BaseModel):
 
             if len(values) != len(set(values)):
                 raise ValueError(f"{attribute} doit être unique dans le catalogue.")
+
+        primary_aliases = [document.aliases[0].casefold() for document in self.documents]
+        if len(primary_aliases) != len(set(primary_aliases)):
+            raise ValueError("Le premier alias de chaque document doit être unique.")
 
         return self

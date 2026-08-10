@@ -28,6 +28,8 @@ from phosprocess.rag.pipeline import (
     RAGRetrievalError,
     RAGRuntimeConfig,
     load_frozen_v3_config,
+    load_rag_v1_retrieval_config,
+    load_rag_v1_runtime_config,
 )
 from phosprocess.rag.prompts import SYSTEM_PROMPT
 from phosprocess.rag.schemas import ChatMessage, GroundedAnswerPayload
@@ -79,7 +81,7 @@ def test_applied_quality_policy_populates_latency_labels() -> None:
     assert result is retrieved
     assert metrics.source_policy_route == "equipment,heat_transfer"
     assert metrics.source_policy_mode == "auto"
-    assert metrics.source_policy_primary == "Incropera"
+    assert metrics.source_policy_primary == "Fundamentals of Heat and Mass Transfer"
     assert metrics.source_policy_fallback_used is False
 
 
@@ -406,7 +408,7 @@ def test_exactly_twenty_candidates_are_required() -> None:
         service.answer("Question métier valide")
 
 
-def test_blocking_repair_succeeds_once() -> None:
+def test_blocking_invalid_citation_fails_closed_without_repair() -> None:
     llm = FakeLLM(
         json_outputs=[
             '{"answer": "Affirmation sans citation."}',
@@ -415,14 +417,13 @@ def test_blocking_repair_succeeds_once() -> None:
     )
     service, _, _, _ = make_service(llm=llm)
 
-    response = service.answer("Question métier valide")
+    with pytest.raises(RAGResponseValidationError, match="citation"):
+        service.answer("Question métier valide")
 
-    assert response.cited_source_numbers == [3]
-    assert [source.source_number for source in response.sources] == [3]
-    assert len(llm.json_calls) == 2
+    assert len(llm.json_calls) == 1
 
 
-def test_blocking_repair_fails_after_second_invalid_output() -> None:
+def test_blocking_invalid_source_number_is_not_repaired() -> None:
     llm = FakeLLM(
         json_outputs=[
             '{"answer": "Affirmation [Source 6]."}',
@@ -431,16 +432,13 @@ def test_blocking_repair_fails_after_second_invalid_output() -> None:
     )
     service, _, _, _ = make_service(llm=llm)
 
-    with pytest.raises(
-        RAGResponseValidationError,
-        match="après une réparation",
-    ):
+    with pytest.raises(RAGResponseValidationError, match="Source 6"):
         service.answer("Question métier valide")
 
-    assert len(llm.json_calls) == 2
+    assert len(llm.json_calls) == 1
 
 
-def test_invalid_json_is_repaired_once() -> None:
+def test_invalid_json_fails_closed_without_repair() -> None:
     llm = FakeLLM(
         json_outputs=[
             "pas du JSON",
@@ -449,10 +447,10 @@ def test_invalid_json_is_repaired_once() -> None:
     )
     service, _, _, _ = make_service(llm=llm)
 
-    response = service.answer("Question métier valide")
+    with pytest.raises(RAGResponseValidationError, match="JSON invalide"):
+        service.answer("Question métier valide")
 
-    assert response.cited_source_numbers == [1]
-    assert len(llm.json_calls) == 2
+    assert len(llm.json_calls) == 1
 
 
 def test_controlled_insufficient_answer_has_no_source() -> None:
@@ -487,9 +485,8 @@ def test_stream_emits_tokens_typed_events_and_final_cited_source() -> None:
     assert event_types == [
         "retrieval_started",
         "retrieval_completed",
-        "token",
-        "token",
         "validation_started",
+        "token",
         "sources",
         "completed",
     ]
@@ -504,7 +501,7 @@ def test_stream_emits_tokens_typed_events_and_final_cited_source() -> None:
     assert completed.timings.first_token_ms is not None
 
 
-def test_stream_repair_succeeds_and_is_streamed() -> None:
+def test_stream_invalid_answer_fails_closed_without_repair() -> None:
     llm = FakeLLM(
         streams=[
             ["Réponse sans citation."],
@@ -514,20 +511,13 @@ def test_stream_repair_succeeds_and_is_streamed() -> None:
     service, _, _, _ = make_service(llm=llm)
 
     events = list(service.stream_answer("Question métier valide"))
-    token_attempts = [
-        event.metadata["attempt"]
-        for event in events
-        if event.event_type == "token"
-    ]
-
-    assert token_attempts == ["initial", "repair", "repair"]
-    assert events[-1].event_type == "completed"
-    assert events[-1].response is not None
-    assert events[-1].response.cited_source_numbers == [4]
-    assert len(llm.stream_calls) == 2
+    assert events[-1].event_type == "error"
+    assert all(event.event_type != "token" for event in events)
+    assert all(event.event_type != "completed" for event in events)
+    assert len(llm.stream_calls) == 1
 
 
-def test_stream_repair_failure_emits_error_without_completed() -> None:
+def test_stream_invalid_answer_reports_objective_error() -> None:
     llm = FakeLLM(
         streams=[
             ["Réponse sans citation."],
@@ -539,11 +529,12 @@ def test_stream_repair_failure_emits_error_without_completed() -> None:
     events = list(service.stream_answer("Question métier valide"))
 
     assert events[-1].event_type == "error"
-    assert "après une réparation" in (events[-1].content or "")
+    assert "citation" in (events[-1].content or "")
     assert all(event.event_type != "completed" for event in events)
+    assert len(llm.stream_calls) == 1
 
 
-def test_truncated_stream_is_repaired_once_before_return() -> None:
+def test_truncated_stream_fails_closed_without_repair() -> None:
     llm = FakeLLM(
         streams=[
             ["Réponse interrompue sans fin"],
@@ -554,12 +545,33 @@ def test_truncated_stream_is_repaired_once_before_return() -> None:
     service, _, _, _ = make_service(llm=llm)
 
     events = list(service.stream_answer("Question métier valide"))
-    completed = events[-1].response
 
-    assert completed is not None
-    assert completed.answer == "Réponse complète [Source 1]."
-    assert completed.latency["repair_attempted"] is True
-    assert completed.latency["ollama_call_count"] == 2
+    assert events[-1].event_type == "error"
+    assert all(event.event_type != "completed" for event in events)
+    assert len(llm.stream_calls) == 1
+
+
+def test_truncated_stream_keeps_completed_cited_prefix_without_repair() -> None:
+    llm = FakeLLM(
+        streams=[
+            ["Fait documentaire complet [Source 1]. Suite interrompue sans fin"],
+            ["Réponse de réparation interdite [Source 1]."],
+        ],
+        stream_generated_tokens=[300, 20],
+    )
+    service, _, _, _ = make_service(llm=llm)
+
+    events = list(service.stream_answer("Question métier valide"))
+
+    assert events[-1].event_type == "completed"
+    response = events[-1].response
+    assert response is not None
+    assert response.answer.startswith("Fait documentaire complet [Source 1]")
+    assert response.answer.endswith(INSUFFICIENT_CONTEXT_ANSWER)
+    assert response.cited_source_numbers == [1]
+    assert response.latency["truncation_salvaged"] is True
+    assert response.latency["repair_attempted"] is False
+    assert len(llm.stream_calls) == 1
 
 
 def test_follow_up_uses_bounded_autonomous_retrieval_query() -> None:
@@ -705,6 +717,21 @@ def test_frozen_snapshot_integrity_and_exact_parameters() -> None:
     assert frozen.fallback == "next_reranker_result"
 
 
+def test_rag_v1_runtime_loads_stable_production_configuration() -> None:
+    frozen = load_rag_v1_retrieval_config(verify_integrity=True)
+    runtime = load_rag_v1_runtime_config()
+
+    assert frozen.selected_variant == "lexical_safeguard_001"
+    assert frozen.snapshot_directory.name == "configs"
+    assert "evaluation" not in frozen.retrieval_config_path.parts
+    assert "evaluation" not in frozen.reranking_config_path.parts
+    assert frozen.retrieval_config_path.name == "retrieval_v2.yaml"
+    assert frozen.reranking_config_path.name == "reranking.yaml"
+    assert frozen.snapshot_sha256 == frozen.snapshot_sha256.upper()
+    assert runtime.ollama.model == "qwen3:8b"
+    assert runtime.ollama.temperature == 0.1
+
+
 def test_frozen_v3_runtime_hash_check_is_explicit_legacy_mode() -> None:
     with pytest.raises(
         RAGConfigurationError,
@@ -791,59 +818,30 @@ def test_domain_question_still_uses_retrieval_after_adaptive_router() -> None:
     assert len(reranker.calls) == 1
 
 
-def test_json_generation_normalizes_supported_duplicate_process_flow() -> None:
-    duplicate_answer = "\n".join(
-        [
-            (
-                "1. The liquid phase is fed by the inlet acid pipe coming "
-                "from the heat exchanger [Source 1]."
-            ),
-            (
-                "2. The pump withdraws liquor from the flash chamber and "
-                "forces it through the heating element back to the flash "
-                "chamber [Source 2]."
-            ),
-            "3. The liquor returns to the flash chamber [Source 2].",
-            (
-                "4. The concentrated finished product acid is withdrawn from "
-                "the vapor body at the product outlet [Source 1]."
-            ),
-            (
-                "5. The product outlet withdraws the concentrated finished "
-                "product acid from the vapor body [Source 1]."
-            ),
+
+def test_json_generation_does_not_inject_coded_process_flow_steps() -> None:
+    generated_answer = (
+        "The pump withdraws liquor from the flash chamber and forces it "
+        "through the heating element back to the flash chamber [Source 1]."
+    )
+
+    llm = FakeLLM(
+        json_outputs=[
+            json.dumps(
+                {
+                    "answer": generated_answer,
+                }
+            )
         ]
     )
-    llm = FakeLLM(
-        json_outputs=[json.dumps({"answer": duplicate_answer})]
+
+    service, _retriever, _reranker, _llm = make_service(
+        llm=llm
     )
-    service, _retriever, _reranker, _llm = make_service(llm=llm)
-    evidence = [
+
+    _evidence = [
         EvidenceBundle(
             source_number=1,
-            document_id="becker",
-            document_title="Becker",
-            filename="becker.pdf",
-            chapter="Acid Concentration Systems",
-            section="Vapor Body",
-            page_start=219,
-            page_end=220,
-            anchor_chunk_id="becker_vapor_body",
-            expanded_chunk_ids=("becker_vapor_body",),
-            display_text=(
-                "The vapor body achieves vapor/liquid separation. The liquid "
-                "phase is fed by the inlet acid pipe coming from the heat "
-                "exchanger. The cycling acid leaves the vapor body through a "
-                "conical bottom. The concentrated finished product acid is "
-                "withdrawn from the vapor body at an outlet below the feed "
-                "level."
-            ),
-            token_count=120,
-            anchor_score=0.9,
-            selection_provenance="reranker",
-        ),
-        EvidenceBundle(
-            source_number=2,
             document_id="perry",
             document_title="Perry",
             filename="perry.pdf",
@@ -851,32 +849,39 @@ def test_json_generation_normalizes_supported_duplicate_process_flow() -> None:
             section="Forced Circulation",
             page_start=1034,
             page_end=1035,
-            anchor_chunk_id="perry_fc",
-            expanded_chunk_ids=("perry_fc",),
+            parent_id="perry_fc_parent",
+            anchor_chunk_ids=(
+                "perry_fc",
+            ),
+            supporting_chunk_ids=(
+                "perry_fc",
+            ),
             display_text=(
-                "A pump ensures circulation past the heating surface. The "
-                "pump withdraws liquor from the flash chamber and forces it "
-                "through the heating element back to the flash chamber."
+                "A pump ensures circulation past the heating surface. "
+                "The pump withdraws liquor from the flash chamber and "
+                "forces it through the heating element back to the "
+                "flash chamber."
             ),
             token_count=100,
-            anchor_score=0.8,
+            documentary_token_count=75,
+            metadata_token_count=25,
+            anchor_token_count=75,
+            best_anchor_score=0.9,
+            context_scope="anchor_only",
             selection_provenance="reranker",
-        ),
+        )
     ]
 
-    payload, citations, insufficient = service._generate_json_answer(
-        user_prompt="Describe the path.",
-        available_source_count=2,
-        evidence_bundles=evidence,
-        question_type="process_flow",
+    payload, citations, insufficient = (
+            service._generate_json_answer(
+                user_prompt="Describe the path.",
+                available_source_count=1,
+            )
     )
 
-    lines = payload.answer.splitlines()
     assert insufficient is False
-    assert citations == [1, 2]
-    assert len(lines) == 5
-    assert [line[:2] for line in lines] == ["1.", "2.", "3.", "4.", "5."]
-    assert "conical bottom" in lines[1]
-    assert "; vapor-liquid separation" in lines[3]
-    assert payload.answer.count("product outlet") == 1
-    assert "heat is applied to evaporate water" not in payload.answer
+    assert citations == [1]
+
+    # Python must not reconstruct a predefined process answer.
+    assert payload.answer == generated_answer
+    assert "conical bottom" not in payload.answer.casefold()

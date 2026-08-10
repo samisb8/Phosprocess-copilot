@@ -5,6 +5,7 @@ from __future__ import annotations
 import codecs
 import json
 import logging
+import os
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
@@ -82,24 +83,16 @@ class OllamaConfig:
             raise ValueError("Le nom du modèle Qwen ne peut pas être vide.")
 
         if not 0 <= self.temperature <= 1:
-            raise ValueError(
-                "La température doit être comprise entre 0 et 1."
-            )
+            raise ValueError("La température doit être comprise entre 0 et 1.")
 
         if self.context_size <= 0:
-            raise ValueError(
-                "context_size doit être strictement positif."
-            )
+            raise ValueError("context_size doit être strictement positif.")
 
         if self.max_output_tokens <= 0:
-            raise ValueError(
-                "max_output_tokens doit être strictement positif."
-            )
+            raise ValueError("max_output_tokens doit être strictement positif.")
 
         if self.timeout_seconds <= 0:
-            raise ValueError(
-                "timeout_seconds doit être strictement positif."
-            )
+            raise ValueError("timeout_seconds doit être strictement positif.")
 
         if self.num_gpu is not None and self.num_gpu < 0:
             raise ValueError("num_gpu doit être positif ou nul.")
@@ -121,8 +114,10 @@ def load_ollama_config(path: Path) -> OllamaConfig:
     if not isinstance(ollama, dict):
         raise ValueError("Section ollama absente ou invalide.")
 
+    host = os.getenv("OLLAMA_HOST", "").strip() or str(ollama["host"])
+
     return OllamaConfig(
-        host=str(ollama["host"]),
+        host=host,
         model=str(ollama["model"]),
         temperature=float(ollama["temperature"]),
         context_size=int(ollama["context_size"]),
@@ -130,11 +125,7 @@ def load_ollama_config(path: Path) -> OllamaConfig:
         timeout_seconds=float(ollama["timeout_seconds"]),
         keep_alive=str(ollama.get("keep_alive", "10m")),
         seed=int(ollama.get("seed", 0)),
-        num_gpu=(
-            int(ollama["num_gpu"])
-            if ollama.get("num_gpu") is not None
-            else None
-        ),
+        num_gpu=(int(ollama["num_gpu"]) if ollama.get("num_gpu") is not None else None),
     )
 
 
@@ -156,15 +147,9 @@ class OllamaLLM:
         self.stream_http_client = (
             stream_http_client
             if stream_http_client is not None
-            else httpx.Client(
-                timeout=httpx.Timeout(
-                    self.config.timeout_seconds
-                )
-            )
+            else httpx.Client(timeout=httpx.Timeout(self.config.timeout_seconds))
         )
-        self._owns_stream_http_client = (
-            stream_http_client is None
-        )
+        self._owns_stream_http_client = stream_http_client is None
 
     @property
     def model_name(self) -> str:
@@ -261,29 +246,20 @@ class OllamaLLM:
 
         effective_model = model or self.config.model
         effective_timeout = (
-            timeout_seconds
-            if timeout_seconds is not None
-            else self.config.timeout_seconds
+            timeout_seconds if timeout_seconds is not None else self.config.timeout_seconds
         )
 
         if effective_timeout <= 0:
             raise ValueError("Le timeout de streaming doit être positif.")
 
         effective_max_output = (
-            max_output_tokens
-            if max_output_tokens is not None
-            else self.config.max_output_tokens
+            max_output_tokens if max_output_tokens is not None else self.config.max_output_tokens
         )
 
         if effective_max_output <= 0:
-            raise ValueError(
-                "max_output_tokens de streaming doit être positif."
-            )
+            raise ValueError("max_output_tokens de streaming doit être positif.")
 
-        prompt_characters = sum(
-            len(message["content"])
-            for message in messages
-        )
+        prompt_characters = sum(len(message["content"]) for message in messages)
         call_metrics = telemetry or OllamaCallMetrics(
             call_type=call_type,
             model=effective_model,
@@ -335,13 +311,9 @@ class OllamaLLM:
 
             ended = time.perf_counter()
             call_metrics.duration_ms = (ended - started) * 1000.0
-            call_metrics.generated_character_count = len(
-                "".join(accumulated)
-            )
+            call_metrics.generated_character_count = len("".join(accumulated))
             call_metrics.generation_ms = (
-                (ended - first_token_at) * 1000.0
-                if first_token_at is not None
-                else 0.0
+                (ended - first_token_at) * 1000.0 if first_token_at is not None else 0.0
             )
             call_metrics.success = success
 
@@ -351,8 +323,7 @@ class OllamaLLM:
             metrics_finalized = True
 
         LOGGER.info(
-            "Streaming Ollama call_type=%s model=%s timeout=%.1fs "
-            "prompt_chars=%d",
+            "Streaming Ollama call_type=%s model=%s timeout=%.1fs prompt_chars=%d",
             call_type,
             effective_model,
             effective_timeout,
@@ -369,39 +340,24 @@ class OllamaLLM:
                 timeout=timeout,
             ) as response:
                 response.raise_for_status()
-                call_metrics.connection_ms = (
-                    time.perf_counter() - connection_started
-                ) * 1000.0
+                call_metrics.connection_ms = (time.perf_counter() - connection_started) * 1000.0
 
                 for event in parse_ollama_jsonl(response.iter_bytes()):
                     event_time = time.perf_counter()
 
                     if call_metrics.time_to_first_event_ms == 0.0:
-                        call_metrics.time_to_first_event_ms = (
-                            event_time - started
-                        ) * 1000.0
+                        call_metrics.time_to_first_event_ms = (event_time - started) * 1000.0
 
                     if event.get("error"):
-                        raise OllamaError(
-                            f"Erreur de flux Ollama: {event['error']}"
-                        )
+                        raise OllamaError(f"Erreur de flux Ollama: {event['error']}")
 
                     message = event.get("message")
-                    content = (
-                        message.get("content")
-                        if isinstance(message, dict)
-                        else None
-                    )
+                    content = message.get("content") if isinstance(message, dict) else None
 
                     if isinstance(content, str) and content:
-                        if (
-                            first_token_at is None
-                            and content.strip()
-                        ):
+                        if first_token_at is None and content.strip():
                             first_token_at = event_time
-                            call_metrics.time_to_first_token_ms = (
-                                event_time - started
-                            ) * 1000.0
+                            call_metrics.time_to_first_token_ms = (event_time - started) * 1000.0
 
                         accumulated.append(content)
                         call_metrics.generated_chunk_count += 1
@@ -409,17 +365,13 @@ class OllamaLLM:
 
                     if event.get("done") is True:
                         if isinstance(event.get("eval_count"), int):
-                            call_metrics.generated_token_count = int(
-                                event["eval_count"]
-                            )
+                            call_metrics.generated_token_count = int(event["eval_count"])
 
                         if isinstance(
                             event.get("prompt_eval_count"),
                             int,
                         ):
-                            call_metrics.prompt_token_count = int(
-                                event["prompt_eval_count"]
-                            )
+                            call_metrics.prompt_token_count = int(event["prompt_eval_count"])
 
                         for event_field, metric_field in (
                             ("load_duration", "model_load_ms"),
@@ -447,10 +399,7 @@ class OllamaLLM:
                         ):
                             call_metrics.generation_tokens_per_second = (
                                 call_metrics.generated_token_count
-                                / (
-                                    call_metrics.model_generation_ms
-                                    / 1000.0
-                                )
+                                / (call_metrics.model_generation_ms / 1000.0)
                             )
 
                         completed = True
@@ -460,26 +409,21 @@ class OllamaLLM:
                 success=False,
                 error_type=type(error).__name__,
             )
-            raise OllamaTimeoutError(
-                "Le délai maximal du flux Ollama a été dépassé."
-            ) from error
+            raise OllamaTimeoutError("Le délai maximal du flux Ollama a été dépassé.") from error
         except httpx.HTTPStatusError as error:
             finalize_metrics(
                 success=False,
                 error_type=type(error).__name__,
             )
             raise OllamaHTTPError(
-                f"Ollama a retourné le statut HTTP "
-                f"{error.response.status_code}."
+                f"Ollama a retourné le statut HTTP {error.response.status_code}."
             ) from error
         except (httpx.HTTPError, OSError) as error:
             finalize_metrics(
                 success=False,
                 error_type=type(error).__name__,
             )
-            raise OllamaStreamInterruptedError(
-                "Le flux Ollama a été interrompu."
-            ) from error
+            raise OllamaStreamInterruptedError("Le flux Ollama a été interrompu.") from error
         except (OllamaError, OllamaResponseValidationError) as error:
             finalize_metrics(
                 success=False,
@@ -512,8 +456,7 @@ class OllamaLLM:
 
         finalize_metrics(success=True)
         LOGGER.info(
-            "Ollama stream completed call_type=%s model=%s chars=%d "
-            "duration_ms=%.1f",
+            "Ollama stream completed call_type=%s model=%s chars=%d duration_ms=%.1f",
             call_type,
             effective_model,
             len("".join(accumulated)),
@@ -573,11 +516,7 @@ class OllamaLLM:
                     "num_ctx": self.config.context_size,
                     "num_predict": self.config.max_output_tokens,
                     "seed": self.config.seed,
-                    **(
-                        {"num_gpu": self.config.num_gpu}
-                        if self.config.num_gpu is not None
-                        else {}
-                    ),
+                    **({"num_gpu": self.config.num_gpu} if self.config.num_gpu is not None else {}),
                 },
             )
         except httpx.TimeoutException as error:
@@ -589,17 +528,41 @@ class OllamaLLM:
                 "Impossible de joindre Ollama. Lancez `ollama serve`."
             ) from error
         except ResponseError as error:
-            raise OllamaError(
-                f"Erreur Ollama {error.status_code}: {error.error}"
-            ) from error
+            raise OllamaError(f"Erreur Ollama {error.status_code}: {error.error}") from error
 
-        elapsed_ms = (
-            time.perf_counter() - started
-        ) * 1000.0
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        done_reason = getattr(
+            response,
+            "done_reason",
+            None,
+        )
+        eval_count = getattr(
+            response,
+            "eval_count",
+            None,
+        )
+        prompt_eval_count = getattr(
+            response,
+            "prompt_eval_count",
+            None,
+        )
+
+        if isinstance(response, dict):
+            if done_reason is None:
+                done_reason = response.get("done_reason")
+            if eval_count is None:
+                eval_count = response.get("eval_count")
+            if prompt_eval_count is None:
+                prompt_eval_count = response.get("prompt_eval_count")
+
         LOGGER.info(
-            "Ollama generation completed model=%s duration_ms=%.1f",
+            "Ollama generation completed model=%s duration_ms=%.1f "
+            "done_reason=%s eval_count=%s prompt_eval_count=%s",
             self.config.model,
             elapsed_ms,
+            done_reason,
+            eval_count,
+            prompt_eval_count,
         )
         message = getattr(response, "message", None)
         content = getattr(message, "content", None)
@@ -611,9 +574,7 @@ class OllamaLLM:
                 content = raw_message.get("content")
 
         if not isinstance(content, str) or not content.strip():
-            raise OllamaResponseValidationError(
-                "Ollama a retourné une réponse vide ou invalide."
-            )
+            raise OllamaResponseValidationError("Ollama a retourné une réponse vide ou invalide.")
 
         return content.strip()
 

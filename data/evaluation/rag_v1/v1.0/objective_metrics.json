@@ -1,0 +1,34 @@
+{
+  "records": 75,
+  "primary_records": 64,
+  "claim_records": 417,
+  "objective": {
+    "citation_validity": 1.0,
+    "citation_coverage": 0.6786570743405276,
+    "numeric_grounding": 0.7282608695652174,
+    "unit_grounding": 0.7872340425531915,
+    "correct_language_rate": 0.9866666666666667,
+    "evidence_available_context_primary": 0.578125,
+    "context_packing_misses": 6,
+    "citation_repairs": 0
+  },
+  "system": {
+    "latency_ms_median": 29337.697799986927,
+    "latency_ms_mean": 35589.892363997256,
+    "first_token_ms_median": 12093.656000011833,
+    "generated_tokens_median": 182,
+    "input_tokens_median": 2674,
+    "context_tokens_median": 2558
+  },
+  "counts_by_split": {
+    "dev": 52,
+    "final_holdout": 23
+  },
+  "counts_by_language": {
+    "fr": 53,
+    "en": 14,
+    "ar": 8
+  },
+  "manual_annotations_complete": true,
+  "semantic_judge_used": false
+}

@@ -1,4 +1,4 @@
-"""Question-focused context windows for the five frozen-v3 sources."""
+"""Question-focused context windows for retrieved evidence sources."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ _STOPWORDS = {
 
 @dataclass(frozen=True, slots=True)
 class PreparedDocumentContext:
-    """Five bounded source passages and their aggregate size."""
+    """Bounded source passages and their aggregate size."""
 
     texts: tuple[str, ...]
     tokens_per_source: tuple[int, ...]
@@ -55,9 +55,7 @@ def query_terms(question: str) -> set[str]:
     """Extract generic content terms without benchmark-specific knowledge."""
 
     return {
-        token.casefold()
-        for token in _WORD.findall(question)
-        if token.casefold() not in _STOPWORDS
+        token.casefold() for token in _WORD.findall(question) if token.casefold() not in _STOPWORDS
     }
 
 
@@ -103,9 +101,7 @@ def select_relevant_window(
 
     terms = query_terms(question)
     sentences = [
-        match.group(0).strip()
-        for match in _SENTENCE.finditer(cleaned)
-        if match.group(0).strip()
+        match.group(0).strip() for match in _SENTENCE.finditer(cleaned) if match.group(0).strip()
     ]
 
     if not sentences:
@@ -115,14 +111,8 @@ def select_relevant_window(
 
     def sentence_score(sentence: str) -> tuple[int, int]:
         lowered = sentence.casefold()
-        term_score = sum(
-            1
-            for term in terms
-            if term in lowered
-        )
-        technical_score = len(
-            re.findall(r"\d|p2o5|so4|caso4|%", lowered)
-        )
+        term_score = sum(1 for term in terms if term in lowered)
+        technical_score = len(re.findall(r"\d|%|[a-z]{1,3}\d+(?:[a-z]\d*)+|[=±×÷]", lowered))
         return term_score, technical_score
 
     anchor = max(
@@ -159,9 +149,7 @@ def select_relevant_window(
 
         _, side, sentence = max(candidates, key=lambda item: item[0])
         candidate_text = (
-            " ".join([sentence, *selected])
-            if side == "left"
-            else " ".join([*selected, sentence])
+            " ".join([sentence, *selected]) if side == "left" else " ".join([*selected, sentence])
         )
 
         if len(candidate_text) > maximum_characters:
@@ -189,15 +177,13 @@ def prepare_document_context(
     maximum_tokens_per_source: int,
     maximum_total_tokens: int,
 ) -> PreparedDocumentContext:
-    """Bound five source passages without changing their identifiers or order."""
+    """Bound retrieved source passages without changing identifiers or order."""
 
     if not source_texts:
         raise ValueError("Le contexte documentaire ne peut pas être vide.")
 
     if maximum_total_tokens < len(source_texts):
-        raise ValueError(
-            "Le budget documentaire total est insuffisant pour les sources."
-        )
+        raise ValueError("Le budget documentaire total est insuffisant pour les sources.")
 
     prepared: list[str] = []
     token_counts: list[int] = []

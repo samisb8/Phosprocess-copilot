@@ -60,22 +60,14 @@ _PROFILES: dict[str, RetrievalProfile] = {
         title_terms=(
             "process",
             "flow",
+            "sequence",
             "operation",
             "fonctionnement",
-            "feed",
+            "entry",
             "inlet",
-            "weak acid",
-            "dilute acid",
-            "circulation",
-            "vapor body",
-            "evaporation chamber",
-            "concentration system",
-            "product outlet",
-            "product acid",
-            "concentrated acid",
-            "strong acid",
-            "withdrawal",
-            "draw-off",
+            "transition",
+            "exit",
+            "outlet",
         ),
     ),
     "balance": RetrievalProfile(
@@ -99,10 +91,9 @@ _PROFILES: dict[str, RetrievalProfile] = {
             "mass",
             "material",
             "component",
-            "p2o5",
             "energy",
-            "heat",
-            "enthalpy",
+            "equation",
+            "table",
         ),
     ),
     "equation_explanation": RetrievalProfile(
@@ -146,14 +137,13 @@ _PROFILES: dict[str, RetrievalProfile] = {
             }
         ),
         title_terms=(
-            "fouling",
-            "scaling",
             "operating",
             "problem",
             "difficulty",
             "troubleshooting",
-            "corrosion",
-            "entrainment",
+            "cause",
+            "effect",
+            "action",
         ),
     ),
     "definition": RetrievalProfile(
@@ -235,9 +225,7 @@ class HierarchicalSectionRetriever:
         self.bm25_directory = self.root / "bm25"
         self.rrf_k = rrf_k
         self.query_embedder = query_embedder
-        self.dense_index = faiss.read_index(
-            str(self.dense_directory / "index.faiss")
-        )
+        self.dense_index = faiss.read_index(str(self.dense_directory / "index.faiss"))
         self.dense_sections = self._load_metadata(
             self.dense_directory / "metadata.jsonl",
             id_field="vector_id",
@@ -292,9 +280,7 @@ class HierarchicalSectionRetriever:
         vector = self.query_embedder.embed_query(query)
         matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
         retrieval_k = (
-            len(self.dense_sections)
-            if document_ids
-            else min(top_k, len(self.dense_sections))
+            len(self.dense_sections) if document_ids else min(top_k, len(self.dense_sections))
         )
         scores, ids = self.dense_index.search(matrix, retrieval_k)
         results: list[tuple[int, float, TechnicalSection]] = []
@@ -321,9 +307,7 @@ class HierarchicalSectionRetriever:
         if not tokens:
             return []
         retrieval_k = (
-            len(self.bm25_sections)
-            if document_ids
-            else min(top_k, len(self.bm25_sections))
+            len(self.bm25_sections) if document_ids else min(top_k, len(self.bm25_sections))
         )
         raw = self.bm25_model.retrieve(
             [tokens],
@@ -362,10 +346,7 @@ class HierarchicalSectionRetriever:
         normalized_path = section.hierarchy_path.casefold()
         title_matches = sum(term in normalized_path for term in profile.title_terms)
         score += min(0.06, title_matches * 0.02)
-        if (
-            TechnicalChunkType.SIMULATION_RESULTS in types
-            and not _SIMULATION_QUERY.search(query)
-        ):
+        if TechnicalChunkType.SIMULATION_RESULTS in types and not _SIMULATION_QUERY.search(query):
             score -= 0.12
         return score
 
@@ -459,9 +440,7 @@ class HierarchicalSectionRetriever:
             per_document[item.section.document_id] = document_count + 1
 
         allowed = frozenset(
-            chunk_id
-            for result in selected
-            for chunk_id in result.section.child_chunk_ids
+            chunk_id for result in selected for chunk_id in result.section.child_chunk_ids
         )
         if not selected or not allowed:
             raise ValueError("La recherche hiérarchique n'a sélectionné aucune section.")

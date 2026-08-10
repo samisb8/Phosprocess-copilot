@@ -116,16 +116,8 @@ class KnowledgeBaseManifest:
                 active=bool(row["active"]),
                 page_count=int(row["page_count"]),
                 chunk_count=int(row["chunk_count"]),
-                version=(
-                    str(row["version"])
-                    if row["version"] is not None
-                    else None
-                ),
-                error=(
-                    str(row["error"])
-                    if row["error"] is not None
-                    else None
-                ),
+                version=(str(row["version"]) if row["version"] is not None else None),
+                error=(str(row["error"]) if row["error"] is not None else None),
             )
             for row in rows
         }
@@ -249,10 +241,7 @@ class KnowledgeBaseManifest:
         now = utc_now()
 
         with self._connect() as connection:
-            connection.execute(
-                "UPDATE document_versions SET active = 0 "
-                "WHERE active = 1"
-            )
+            connection.execute("UPDATE document_versions SET active = 0 WHERE active = 1")
 
             for (filename, sha256), status in retired_statuses.items():
                 connection.execute(

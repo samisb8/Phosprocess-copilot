@@ -36,20 +36,12 @@ def _requires_docling(page_chunk: dict[str, Any]) -> tuple[bool, list[str]]:
     markdown = str(page_chunk.get("text", "")).strip()
     boxes = page_chunk.get("page_boxes", [])
 
-    box_classes = [
-        str(box.get("class", ""))
-        for box in boxes
-        if isinstance(box, dict)
-    ]
+    box_classes = [str(box.get("class", "")) for box in boxes if isinstance(box, dict)]
 
-    complex_elements = sum(
-        item in _COMPLEX_LAYOUT_CLASSES for item in box_classes
-    )
+    complex_elements = sum(item in _COMPLEX_LAYOUT_CLASSES for item in box_classes)
 
     short_numeric_lines = sum(
-        1
-        for line in markdown.splitlines()
-        if len(line.split()) <= 3 and re.search(r"\d", line)
+        1 for line in markdown.splitlines() if len(line.split()) <= 3 and re.search(r"\d", line)
     )
 
     warnings: list[str] = []
@@ -100,15 +92,9 @@ def _parse_page_with_docling(
     markdown = document.export_to_markdown()
     plain_text = document.export_to_text()
 
-    tables = [
-        table.export_to_markdown(doc=document)
-        for table in document.tables
-    ]
+    tables = [table.export_to_markdown(doc=document) for table in document.tables]
 
-    figures = [
-        f"picture_{index}"
-        for index, _ in enumerate(document.pictures, start=1)
-    ]
+    figures = [f"picture_{index}" for index, _ in enumerate(document.pictures, start=1)]
 
     return ParsedPage(
         content=PageContent(

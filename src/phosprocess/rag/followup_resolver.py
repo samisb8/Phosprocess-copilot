@@ -1,9 +1,14 @@
-"""Deterministic business-aware standalone-query resolution."""
+"""Conservative standalone-query resolution without adding domain facts."""
 
 from __future__ import annotations
 
+import json
 import re
+import time
 from dataclasses import dataclass
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from phosprocess.rag.conversation_state import ConversationState
 
@@ -19,13 +24,6 @@ _AUTONOMOUS_TECHNICAL = re.compile(
     r"pompe|pump|gypse|gypsum|thermodynam|enthalp|sursaturation|"
     r"supersaturation|pid|mpc|pression|pressure|température|temperature|"
     r"bouilleur|flash chamber|vapor body|condenseur|condenser)\b",
-    flags=re.IGNORECASE,
-)
-_STATE_DEPENDENT_INTENT = re.compile(
-    r"\b(?:contr[oô]l\w*|r[eé]gul\w*|manipulat\w*|"
-    r"maint(?:ain|enir)\w*|stabilis\w*|consigne|setpoint|sortie|outlet|"
-    r"n[eé]cessaire|necessary|send|ramen\w*|renvoy\w*|return|role|rôle|"
-    r"fonction|why|pourquoi|comment|how|after|après|difference|différence)\b",
     flags=re.IGNORECASE,
 )
 _FRENCH = re.compile(
@@ -88,6 +86,49 @@ class StandaloneQueryResolution:
     intent_hint: str | None = None
     inherited_source_mode: str | None = None
     requires_llm_resolution: bool = False
+    inherits_source: bool = False
+    explicit_source: str | None = None
+    resolver_latency_ms: float = 0.0
+    resolver_llm_call_count: int = 0
+
+
+class _QueryResolverPayload(BaseModel):
+    """Strict answer-free output for one ambiguous conversational query."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    standalone_query: str = Field(min_length=1, max_length=2000)
+    is_followup: bool
+    inherits_source: bool
+    explicit_source: str | None = None
+
+
+class _OllamaQueryResolverPayload(BaseModel):
+    """Grammar-compatible transport; strict validation follows JSON parsing."""
+
+    standalone_query: str
+    is_followup: bool
+    inherits_source: bool
+    explicit_source: str | None = None
+
+
+_QUERY_RESOLVER_SYSTEM_PROMPT = "\n".join(
+    (
+        "You resolve ambiguous conversational questions for document retrieval.",
+        "Return a standalone search question, never an answer.",
+        "The standalone question must remain fully retrievable without access to history.",
+        "Carry forward every subject or topic needed to identify what is being asked.",
+        "Conversation history is for reference resolution only and is never evidence.",
+        "Do not copy factual claims from prior assistant answers and do not add domain facts.",
+        "Preserve the language of the current question.",
+        "Resolve pronouns, omitted subjects, short continuations, and topic continuity.",
+        "A clearly new topic is not a follow-up.",
+        "An explicit source in the current question always overrides an inherited source.",
+        "Set inherits_source only for a genuine follow-up with no new explicit source.",
+        "explicit_source must be null unless the current question explicitly names one.",
+        "Return exactly one JSON object matching the supplied schema and no reasoning.",
+    )
+)
 
 
 def _entity_for_question(entity: str, question: str) -> str:
@@ -99,43 +140,8 @@ def _entity_for_question(entity: str, question: str) -> str:
 
 
 def _infer_intent_hint(question: str, focus_entity: str | None) -> str | None:
-    normalized = question.casefold().replace("’", "'")
-    pump = focus_entity == "pompe de circulation" or any(
-        marker in normalized
-        for marker in ("pompe de circulation", "circulation pump", "مضخة الدوران")
-    )
-    if pump and any(
-        marker in normalized
-        for marker in (
-            "necessary",
-            "nécessaire",
-            "necessaire",
-            "why",
-            "pourquoi",
-            "ضرورية",
-            "لماذا",
-        )
-    ):
-        return "pump_necessity"
-    if pump and any(
-        marker in normalized
-        for marker in (
-            "back to the flash chamber",
-            "send the liquid back",
-            "ramener",
-            "renvoyer",
-            "return",
-            "إعاد",
-        )
-    ):
-        return "pump_return"
-    if pump and any(
-        marker in normalized
-        for marker in ("role", "rôle", "fonction", "what does", "دور")
-    ):
-        return "pump_role"
-    if any(marker in normalized for marker in ("et après", "and then", "what next", "ثم ماذا")):
-        return "next_process_stage"
+    """Keep compatibility without encoding domain-specific answer intents."""
+    del question, focus_entity
     return None
 
 
@@ -219,30 +225,8 @@ def resolve_standalone_query(
 
     is_short = len(original.split()) <= 7
     has_followup_marker = _FOLLOWUP.search(original) is not None
-    autonomous = (
-        _AUTONOMOUS_TECHNICAL.search(original) is not None
-        and not has_followup_marker
-    )
-    state_entities_available = any(
-        (
-            state.focus_entity,
-            state.current_process,
-            state.current_equipment,
-            state.current_fluid,
-            state.current_operation,
-            state.current_variable,
-            state.current_problem,
-        )
-    )
-    needs_state_context = (
-        state_entities_available
-        and _STATE_DEPENDENT_INTENT.search(original) is not None
-        and _AUTONOMOUS_TECHNICAL.search(original) is None
-    )
-
-    if not needs_state_context and (
-        autonomous or (not has_followup_marker and not is_short)
-    ):
+    autonomous = _AUTONOMOUS_TECHNICAL.search(original) is not None and not has_followup_marker
+    if autonomous or (not has_followup_marker and not is_short):
         state.observe_question(original)
         state.record_resolution(original)
         return StandaloneQueryResolution(
@@ -271,10 +255,9 @@ def resolve_standalone_query(
                 focus_entity=focus_entity,
                 intent_hint=intent_hint,
                 inherited_source_mode=(
-                    state.current_source_mode
-                    if state.source_scope_explicit
-                    else None
+                    state.current_source_mode if state.source_scope_explicit else None
                 ),
+                requires_llm_resolution=True,
             )
 
     entity_values = [
@@ -313,7 +296,86 @@ def resolve_standalone_query(
         entities_used=entities,
         focus_entity=focus_entity,
         intent_hint=_infer_intent_hint(standalone, focus_entity),
+        inherited_source_mode=(state.current_source_mode if state.source_scope_explicit else None),
+        # Broad state was appended, but the actual referent was not bound.
+        # A prior user turn can resolve this through the structured fallback.
+        requires_llm_resolution=True,
+    )
+
+
+def resolve_ambiguous_query_with_llm(
+    question: str,
+    *,
+    state: ConversationState,
+    llm: Any,
+) -> StandaloneQueryResolution:
+    """Use one answer-free LLM call only when deterministic resolution is ambiguous."""
+
+    previous_user_questions = tuple(state.recent_turns)
+    previous_standalone_query = state.last_standalone_query
+    active_explicit_source = (
+        state.current_source_mode if state.source_scope_explicit else None
+    )
+    deterministic = resolve_standalone_query(question, state=state)
+    if not deterministic.requires_llm_resolution or not previous_user_questions:
+        return deterministic
+
+    state_view = {
+        "active_explicit_source": active_explicit_source,
+        "last_standalone_query": previous_standalone_query,
+    }
+    history = "\n".join(
+        f"User turn {index}: {value}"
+        for index, value in enumerate(previous_user_questions[-4:], start=1)
+    )
+    user_prompt = "\n\n".join(
+        (
+            f"PREVIOUS USER QUESTIONS\n{history}",
+            "CONVERSATION STATE\n"
+            + json.dumps(state_view, ensure_ascii=False, sort_keys=True),
+            f"CURRENT QUESTION\n{question.strip()}",
+            (
+                "Return standalone_query, is_followup, inherits_source, and "
+                "explicit_source. Do not answer the question."
+            ),
+        )
+    )
+    started = time.perf_counter()
+    try:
+        _transport, raw = llm.chat_json_with_raw(
+            user_prompt=user_prompt,
+            system_prompt=_QUERY_RESOLVER_SYSTEM_PROMPT,
+            response_model=_OllamaQueryResolverPayload,
+        )
+        payload = _QueryResolverPayload.model_validate(json.loads(raw))
+    except Exception:
+        return deterministic
+    latency_ms = (time.perf_counter() - started) * 1000.0
+    standalone = payload.standalone_query.strip()
+    if not standalone or "[Source" in standalone or "EVIDENCE" in standalone.upper():
+        return deterministic
+
+    state.record_resolution(standalone)
+    return StandaloneQueryResolution(
+        original_question=question.strip(),
+        standalone_query=standalone,
+        followup_detected=payload.is_followup,
+        resolver_type="llm_ambiguous_followup",
+        entities_used=(),
+        focus_entity=state.focus_entity,
+        intent_hint=None,
         inherited_source_mode=(
-            state.current_source_mode if state.source_scope_explicit else None
+            state.current_source_mode
+            if payload.inherits_source and state.source_scope_explicit
+            else None
         ),
+        requires_llm_resolution=False,
+        inherits_source=payload.inherits_source,
+        explicit_source=(
+            payload.explicit_source.strip()
+            if payload.explicit_source and payload.explicit_source.strip()
+            else None
+        ),
+        resolver_latency_ms=latency_ms,
+        resolver_llm_call_count=1,
     )

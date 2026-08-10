@@ -156,18 +156,9 @@ class ConversationState:
         operation = _last_match(question, _OPERATION_PATTERNS)
         variable = _last_match(question, _VARIABLE_PATTERNS)
         problem = _last_match(question, _PROBLEM_PATTERNS)
-
         if equipment:
             self.current_equipment = equipment
             self.focus_entity = focus_equipment or equipment
-
-            if "évaporateur" in question.casefold() or "evaporator" in question.casefold():
-                self.current_process = "production d’acide phosphorique"
-                self.current_fluid = self.current_fluid or "acide phosphorique"
-                self.current_operation = (
-                    self.current_operation
-                    or "concentration par évaporation"
-                )
 
         if fluid:
             self.current_fluid = fluid
@@ -180,12 +171,6 @@ class ConversationState:
 
         if problem:
             self.current_problem = problem
-
-        if re.search(r"\b(?:atelier|ocp|workshop)\b", question, re.I):
-            self.current_unit = "atelier d’acide phosphorique"
-
-        if "acide phosphorique" in question.casefold() or "phosphoric acid" in question.casefold():
-            self.current_process = "production d’acide phosphorique"
 
         self.last_user_question = question.strip()
         self.recent_turns.append(question.strip())
@@ -207,11 +192,7 @@ class ConversationState:
         self.current_source_mode = normalized
         self.current_document_scope = normalized
         self.source_scope_explicit = explicit and normalized != "auto"
-        self.source_scope_origin = (
-            origin.strip().casefold()
-            if self.source_scope_explicit
-            else None
-        )
+        self.source_scope_origin = origin.strip().casefold() if self.source_scope_explicit else None
 
     def release_source_scope(self) -> None:
         """Return to automatic routing for a new autonomous question."""

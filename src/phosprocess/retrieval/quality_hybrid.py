@@ -64,9 +64,7 @@ def _add_role_score(
     role_name: str,
     value: float,
 ) -> None:
-    candidate.role_scores[role_name] = (
-        candidate.role_scores.get(role_name, 0.0) + value
-    )
+    candidate.role_scores[role_name] = candidate.role_scores.get(role_name, 0.0) + value
 
 
 def _to_result(candidate: _Candidate, rank: int) -> HybridSearchResult:
@@ -181,9 +179,7 @@ def search_expanded_hybrid(
             item = candidates.setdefault(result.chunk.chunk_id, _Candidate(result.chunk))
             item.sparse_rank = result.rank
             item.sparse_score = result.score
-            item.sparse_contribution += _contribution(
-                result.rank, weight=1.0, rrf_k=config.rrf_k
-            )
+            item.sparse_contribution += _contribution(result.rank, weight=1.0, rrf_k=config.rrf_k)
             _add_role_score(
                 item,
                 role_name=role_name,
@@ -380,8 +376,7 @@ def search_planned_hybrid(
         )
         for item, vectors in zip(colbert_pool, passage_vectors, strict=True):
             item.colbert_score = max(
-                embedder.colbert_score(query_vector, vectors)
-                for query_vector in query_vectors
+                embedder.colbert_score(query_vector, vectors) for query_vector in query_vectors
             )
 
     globally_ranked = sorted(
@@ -403,11 +398,7 @@ def search_planned_hybrid(
     role_reserve_k = 3
     for role in plan.roles:
         role_ranked = sorted(
-            (
-                item
-                for item in union
-                if item.role_scores.get(role.name, 0.0) > 0.0
-            ),
+            (item for item in union if item.role_scores.get(role.name, 0.0) > 0.0),
             key=lambda item: (
                 -item.role_scores.get(role.name, 0.0),
                 -_ordering_score(item),
@@ -426,11 +417,7 @@ def search_planned_hybrid(
 
     ranked = [
         *reserved,
-        *(
-            item
-            for item in globally_ranked
-            if item.chunk.chunk_id not in reserved_ids
-        ),
+        *(item for item in globally_ranked if item.chunk.chunk_id not in reserved_ids),
     ][:top_k]
     results = [_to_result(item, rank) for rank, item in enumerate(ranked, start=1)]
     return HybridSearchResponse(

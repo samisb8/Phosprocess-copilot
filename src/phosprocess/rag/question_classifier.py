@@ -33,7 +33,6 @@ class QuestionType(StrEnum):
 class AnswerPolicy:
     """Formatting and size limits selected from the question type."""
 
-    max_words: int
     numbered_steps: bool = False
     define_variables: bool = False
     preserve_units: bool = False
@@ -42,45 +41,39 @@ class AnswerPolicy:
 
 
 ANSWER_POLICIES: dict[QuestionType, AnswerPolicy] = {
-    QuestionType.DEFINITION: AnswerPolicy(140),
-    QuestionType.EXPLANATION: AnswerPolicy(230),
-    QuestionType.PROCESS_FLOW: AnswerPolicy(320, numbered_steps=True),
-    QuestionType.PROCEDURE: AnswerPolicy(320, numbered_steps=True),
-    QuestionType.COMPARISON: AnswerPolicy(260),
+    QuestionType.DEFINITION: AnswerPolicy(),
+    QuestionType.EXPLANATION: AnswerPolicy(),
+    QuestionType.PROCESS_FLOW: AnswerPolicy(numbered_steps=True),
+    QuestionType.PROCEDURE: AnswerPolicy(numbered_steps=True),
+    QuestionType.COMPARISON: AnswerPolicy(),
     QuestionType.BALANCE: AnswerPolicy(
-        300,
         define_variables=True,
         preserve_units=True,
     ),
     QuestionType.THERMODYNAMIC_RELATION: AnswerPolicy(
-        300,
         define_variables=True,
         preserve_units=True,
     ),
     QuestionType.EQUATION_EXPLANATION: AnswerPolicy(
-        300,
         define_variables=True,
         preserve_units=True,
     ),
-    QuestionType.TABLE_QUESTION: AnswerPolicy(280),
+    QuestionType.TABLE_QUESTION: AnswerPolicy(),
     QuestionType.CALCULATION: AnswerPolicy(
-        350,
         show_assumptions=True,
         preserve_units=True,
     ),
     QuestionType.MOMENTUM_DIFFUSION: AnswerPolicy(
-        260,
         define_variables=True,
         preserve_units=True,
     ),
     QuestionType.TROUBLESHOOTING: AnswerPolicy(
-        300,
         organize_as_causes_effects_actions=True,
     ),
-    QuestionType.CONTROL_STRATEGY: AnswerPolicy(300),
-    QuestionType.SAFETY: AnswerPolicy(260),
-    QuestionType.PLANT_SPECIFIC: AnswerPolicy(300),
-    QuestionType.AMBIGUOUS: AnswerPolicy(180),
+    QuestionType.CONTROL_STRATEGY: AnswerPolicy(),
+    QuestionType.SAFETY: AnswerPolicy(),
+    QuestionType.PLANT_SPECIFIC: AnswerPolicy(),
+    QuestionType.AMBIGUOUS: AnswerPolicy(),
 }
 
 
@@ -97,17 +90,10 @@ class QuestionClassification:
 def _normalize_question(question: str) -> str:
     """Normalize accents, apostrophes and informal spacing for rules."""
 
-    value = (
-        question.strip()
-        .casefold()
-        .replace("’", "'")
-        .replace("‘", "'")
-    )
+    value = question.strip().casefold().replace("’", "'").replace("‘", "'")
     decomposed = unicodedata.normalize("NFKD", value)
     without_marks = "".join(
-        character
-        for character in decomposed
-        if not unicodedata.combining(character)
+        character for character in decomposed if not unicodedata.combining(character)
     )
     without_apostrophes = re.sub(r"['’‘-]+", " ", without_marks)
     return re.sub(r"\s+", " ", without_apostrophes).strip()
@@ -213,9 +199,7 @@ def classify_question(question: str) -> QuestionClassification:
         ),
         (
             QuestionType.EXPLANATION,
-            re.compile(
-                r"\b(?:why|pourquoi|role|rôle|how does|دور|لماذا|كيف)\b"
-            ),
+            re.compile(r"\b(?:why|pourquoi|role|rôle|how does|دور|لماذا|كيف)\b"),
             "explanation_focus",
         ),
         (

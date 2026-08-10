@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pymupdf
 import pytest
 from docling.datamodel.base_models import ConversionStatus
-from docling_core.types.doc import DocItemLabel, DoclingDocument
+from docling_core.types.doc import DocItemLabel, DoclingDocument, Size
 
 from phosprocess.ingestion.docling_extractor import (
     DoclingStructuredExtractor,
@@ -168,95 +168,162 @@ def test_unusable_fallback_is_not_cached(tmp_path: Path) -> None:
     assert not list((tmp_path / "parsed").rglob("extraction_report.json"))
 
 
+
+
+def _fake_page_document(
+    first_page: int,
+    last_page: int,
+) -> DoclingDocument:
+    """Build a minimal but structurally valid Docling document."""
+
+    document = DoclingDocument(
+        name=f"pages-{first_page}-{last_page}"
+    )
+
+    page_count = last_page - first_page + 1
+
+    for page_no in range(1, page_count + 1):
+        document.add_page(
+            page_no=page_no,
+            size=Size(
+                width=100.0,
+                height=100.0,
+            ),
+        )
+
+    return document
+
+
 def test_large_document_conversion_uses_bounded_page_ranges(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[int, int] | None] = []
+    calls: list[tuple[int, int]] = []
 
     class Recorder:
-        def convert(self, _source: Path, **kwargs: object) -> object:
-            page_range = kwargs.get("page_range")
+        def convert(
+            self,
+            _source: Path,
+            **kwargs: object,
+        ) -> object:
+            page_range = kwargs["page_range"]
+
+            assert isinstance(page_range, tuple)
+
+            first_page, last_page = page_range
+
+            assert isinstance(first_page, int)
+            assert isinstance(last_page, int)
+
             calls.append(
-                page_range
-                if isinstance(page_range, tuple)
-                else None
-            )
-            return SimpleNamespace(
-                status=ConversionStatus.SUCCESS,
-                document=SimpleNamespace(page_range=page_range),
+                (first_page, last_page)
             )
 
-    monkeypatch.setattr(
-        DoclingDocument,
-        "concatenate",
-        lambda documents: SimpleNamespace(documents=documents),
-    )
+            return SimpleNamespace(
+                status=ConversionStatus.SUCCESS,
+                document=_fake_page_document(
+                    first_page,
+                    last_page,
+                ),
+            )
+
     extractor = DoclingStructuredExtractor(
         parsed_root=tmp_path,
         converter=Recorder(),
+    )
+
+    batch_cache = (
+        tmp_path
+        / "document"
+        / ".sha256.batches"
     )
 
     result = extractor._convert(
         extractor.converter,
         tmp_path / "large.pdf",
-        page_count=1201,
+        page_count=251,
+        batch_cache_directory=batch_cache,
     )
 
-    assert calls == [(1, 500), (501, 1000), (1001, 1201)]
-    assert len(result.documents) == 3
+    assert calls == [
+        (1, 100),
+        (101, 200),
+        (201, 251),
+    ]
+
+    assert result.num_pages() == 251
 
 
 def test_large_document_conversion_reuses_sha_batch_cache(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[int, int]] = []
 
     class Recorder:
-        def convert(self, _source: Path, **kwargs: object) -> object:
+        def convert(
+            self,
+            _source: Path,
+            **kwargs: object,
+        ) -> object:
             page_range = kwargs["page_range"]
+
             assert isinstance(page_range, tuple)
-            calls.append(page_range)
+
+            first_page, last_page = page_range
+
+            assert isinstance(first_page, int)
+            assert isinstance(last_page, int)
+
+            calls.append(
+                (first_page, last_page)
+            )
+
             return SimpleNamespace(
                 status=ConversionStatus.SUCCESS,
-                document=DoclingDocument(
-                    name=f"pages-{page_range[0]}-{page_range[1]}"
+                document=_fake_page_document(
+                    first_page,
+                    last_page,
                 ),
             )
 
-    monkeypatch.setattr(
-        DoclingDocument,
-        "concatenate",
-        lambda documents: SimpleNamespace(documents=documents),
-    )
     extractor = DoclingStructuredExtractor(
         parsed_root=tmp_path,
         converter=Recorder(),
     )
-    batch_cache = tmp_path / "document" / ".sha256.batches"
+
+    batch_cache = (
+        tmp_path
+        / "document"
+        / ".sha256.batches"
+    )
 
     first = extractor._convert(
         extractor.converter,
         tmp_path / "large.pdf",
-        page_count=501,
+        page_count=201,
         batch_cache_directory=batch_cache,
     )
+
+    assert first.num_pages() == 201
+
+    assert calls == [
+        (1, 100),
+        (101, 200),
+        (201, 201),
+    ]
+
+    # Second execution must load the successful SHA batch cache
+    # without calling Docling again.
+    calls.clear()
+
     second = extractor._convert(
         extractor.converter,
         tmp_path / "large.pdf",
-        page_count=501,
+        page_count=201,
         batch_cache_directory=batch_cache,
     )
 
-    assert calls == [(1, 500), (501, 501)]
-    assert len(first.documents) == 2
-    assert len(second.documents) == 2
-    assert sorted(path.name for path in batch_cache.glob("*.json")) == [
-        "000001-000500.json",
-        "000501-000501.json",
-    ]
-
+    assert second.num_pages() == 201
+    assert calls == []
 
 def test_native_formula_text_is_preserved_without_optional_enrichment() -> None:
     document = DoclingDocument(name="formula")
@@ -308,3 +375,91 @@ def test_page_quality_aggregates_docling_items_in_one_pass() -> None:
     assert document.iterations == 1
     assert pages[0].character_count == len(technical_text.strip())
     assert pages[0].status is PageExtractionStatus.NATIVE_TEXT
+
+def test_large_document_conversion_splits_partial_ranges(
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[int, int]] = []
+
+    class Recorder:
+        def convert(
+            self,
+            _source: Path,
+            **kwargs: object,
+        ) -> object:
+            page_range = kwargs["page_range"]
+
+            assert isinstance(page_range, tuple)
+
+            first_page, last_page = page_range
+
+            assert isinstance(first_page, int)
+            assert isinstance(last_page, int)
+
+            calls.append(
+                (first_page, last_page)
+            )
+
+            count = (
+                last_page
+                - first_page
+                + 1
+            )
+
+            if count > 25:
+                return SimpleNamespace(
+                    status=ConversionStatus.PARTIAL_SUCCESS,
+                    document=_fake_page_document(
+                        first_page,
+                        last_page,
+                    ),
+                    errors=("synthetic partial conversion",),
+                )
+
+            return SimpleNamespace(
+                status=ConversionStatus.SUCCESS,
+                document=_fake_page_document(
+                    first_page,
+                    last_page,
+                ),
+            )
+
+    extractor = DoclingStructuredExtractor(
+        parsed_root=tmp_path,
+        converter=Recorder(),
+    )
+
+    batch_cache = (
+        tmp_path
+        / "document"
+        / ".sha256.batches"
+    )
+
+    result = extractor._convert(
+        extractor.converter,
+        tmp_path / "adaptive.pdf",
+        page_count=60,
+        batch_cache_directory=batch_cache,
+    )
+
+    assert result.num_pages() == 60
+
+    # Initial range is rejected because it is partial.
+    assert calls[0] == (1, 60)
+
+    # Recursive subdivision must really have happened.
+    assert len(calls) > 1
+
+    successful_ranges = [
+        (first_page, last_page)
+        for first_page, last_page in calls
+        if last_page - first_page + 1 <= 25
+    ]
+
+    assert successful_ranges
+
+    # Every final accepted leaf is bounded by the synthetic limit.
+    assert all(
+        last_page - first_page + 1 <= 25
+        for first_page, last_page in successful_ranges
+    )

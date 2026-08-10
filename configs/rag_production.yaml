@@ -3,7 +3,7 @@ ollama:
   model: qwen3:8b
   temperature: 0.1
   context_size: 8192
-  max_output_tokens: 450
+  max_output_tokens: 1024
   timeout_seconds: 120.0
   keep_alive: 30m
   seed: 0
