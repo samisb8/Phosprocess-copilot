@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -18,8 +19,12 @@ from phosprocess.database.models import (
     MessageCitation,
 )
 from phosprocess.rag.schemas import (
+    ChatMessage as RAGChatMessage,
+)
+from phosprocess.rag.schemas import (
     RAGResponse,
     RAGSource,
+    RAGStreamEvent,
     RAGTimings,
 )
 from tests.support.database import (
@@ -34,6 +39,9 @@ class _FakeChatRAGService:
     def __init__(self) -> None:
         self.initial_loading_ms = 100.0
         self.answer_calls: list[tuple[str, str, str]] = []
+        self.stream_calls: list[
+            tuple[str, list[tuple[str, str]], str, str]
+        ] = []
         self.closed = False
 
     def knowledge_base_status(self) -> dict[str, Any]:
@@ -113,6 +121,34 @@ class _FakeChatRAGService:
                 first_token_ms=450.0,
             ),
             latency={},
+        )
+
+    def stream_answer(
+        self,
+        question: str,
+        history: list[RAGChatMessage] | None = None,
+        *,
+        source_mode: str = "automatic",
+        language_mode: str = "auto",
+    ) -> Iterator[RAGStreamEvent]:
+        self.stream_calls.append(
+            (
+                question,
+                [
+                    (message.role, message.content)
+                    for message in history or []
+                ],
+                source_mode,
+                language_mode,
+            )
+        )
+        yield RAGStreamEvent(
+            event_type="completed",
+            response=self.answer(
+                question,
+                source_mode=source_mode,
+                language_mode=language_mode,
+            ),
         )
 
     def close(self) -> None:
@@ -294,6 +330,22 @@ def test_chat_appends_to_an_existing_session() -> None:
     assert chat_session is not None
     assert chat_session.title == "Premi?re question"
 
+    assert service.stream_calls == [
+        (
+            "Deuxi?me question",
+            [
+                ("user", "Premi?re question"),
+                (
+                    "assistant",
+                    "La pompe maintient la circulation requise dans "
+                    "la boucle d'?vaporation [1].",
+                ),
+            ],
+            "automatic",
+            "auto",
+        )
+    ]
+
 
 def test_chat_returns_404_for_unknown_session() -> None:
     """An unknown session identifier should not create partial data."""
@@ -340,6 +392,8 @@ def test_chat_returns_404_for_unknown_session() -> None:
     }
     assert session_count == 0
     assert message_count == 0
+    assert service.answer_calls == []
+    assert service.stream_calls == []
 
 
 def test_chat_returns_503_when_database_is_unavailable() -> None:

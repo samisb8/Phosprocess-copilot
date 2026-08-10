@@ -65,7 +65,13 @@ from phosprocess.database.services.chat_session_management import (
     ChatSessionManagementService,
     RenamedChatSession,
 )
-from phosprocess.rag.schemas import RAGResponse, RAGSource
+from phosprocess.rag.schemas import (
+    ChatMessage as RAGChatMessage,
+)
+from phosprocess.rag.schemas import (
+    RAGResponse,
+    RAGSource,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -127,10 +133,7 @@ def _map_session_page(
     """Convert one paginated result to the public API."""
 
     return ChatSessionListResponse(
-        items=[
-            _map_session_summary(summary)
-            for summary in page.items
-        ],
+        items=[_map_session_summary(summary) for summary in page.items],
         total=page.total,
         limit=page.limit,
         offset=page.offset,
@@ -177,10 +180,7 @@ def _map_history_message(
         response_language=message.response_language,
         question_type=message.question_type,
         total_ms=message.total_ms,
-        citations=[
-            _map_history_citation(citation)
-            for citation in message.citations
-        ],
+        citations=[_map_history_citation(citation) for citation in message.citations],
     )
 
 
@@ -194,10 +194,51 @@ def _map_history(
         title=history.title,
         created_at=history.created_at,
         updated_at=history.updated_at,
-        messages=[
-            _map_history_message(message)
-            for message in history.messages
-        ],
+        messages=[_map_history_message(message) for message in history.messages],
+    )
+
+
+def _rag_history_messages(
+    history: ChatSessionHistory,
+) -> list[RAGChatMessage]:
+    """Convert persisted session messages to non-documentary RAG memory."""
+
+    return [
+        RAGChatMessage(
+            role=message.role,
+            content=message.content,
+        )
+        for message in history.messages
+        if message.role in {"user", "assistant"}
+    ]
+
+
+def _answer_with_history(
+    service: RAGService,
+    *,
+    question: str,
+    history: list[RAGChatMessage],
+    source_mode: str,
+    language_mode: str,
+) -> RAGResponse:
+    """Consume the conversational RAG stream and return its final response."""
+
+    error_message: str | None = None
+
+    for event in service.stream_answer(
+        question,
+        history,
+        source_mode=source_mode,
+        language_mode=language_mode,
+    ):
+        if event.event_type == "completed" and event.response is not None:
+            return event.response
+
+        if event.event_type == "error":
+            error_message = event.content or "Conversational RAG execution failed."
+
+    raise RuntimeError(
+        error_message or "Conversational RAG did not produce a final response."
     )
 
 
@@ -213,10 +254,7 @@ def _map_response(
         assistant_message_id=persisted.assistant_message_id,
         question=response.question,
         answer=response.answer,
-        sources=[
-            _map_source(source)
-            for source in response.sources
-        ],
+        sources=[_map_source(source) for source in response.sources],
         cited_source_numbers=list(response.cited_source_numbers),
         insufficient_context=response.insufficient_context,
         model_name=response.model_name,
@@ -283,9 +321,7 @@ async def list_chat_sessions(
         )
         page = await run_in_threadpool(operation)
     except Exception as exception:
-        LOGGER.exception(
-            "The chat sessions could not be listed."
-        )
+        LOGGER.exception("The chat sessions could not be listed.")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -343,9 +379,7 @@ async def rename_chat_session(
             detail=str(exception),
         ) from exception
     except Exception as exception:
-        LOGGER.exception(
-            "The chat session could not be renamed."
-        )
+        LOGGER.exception("The chat session could not be renamed.")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -393,18 +427,14 @@ async def delete_chat_session(
             detail=str(exception),
         ) from exception
     except Exception as exception:
-        LOGGER.exception(
-            "The chat session could not be deleted."
-        )
+        LOGGER.exception("The chat session could not be deleted.")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The chat session could not be deleted.",
         ) from exception
 
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT
-    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -445,9 +475,7 @@ async def get_chat_session_history(
             detail=str(exception),
         ) from exception
     except Exception as exception:
-        LOGGER.exception(
-            "The chat session history could not be loaded."
-        )
+        LOGGER.exception("The chat session history could not be loaded.")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -472,9 +500,7 @@ async def get_chat_session_history(
             "description": "The RAG or database service is not ready.",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "description": (
-                "The RAG execution or persistence transaction failed."
-            ),
+            "description": ("The RAG execution or persistence transaction failed."),
         },
     },
     summary="Ask a grounded technical question",
@@ -493,17 +519,55 @@ async def chat(
         ChatPersistenceService,
         Depends(get_chat_persistence_service),
     ],
+    history_service: Annotated[
+        ChatHistoryService,
+        Depends(get_chat_history_service),
+    ],
 ) -> ChatResponse:
     """Run the RAG and persist its complete exchange."""
 
+    rag_history: list[RAGChatMessage] | None = None
+
+    if payload.session_id is not None:
+        try:
+            history_operation = partial(
+                history_service.get_session_history,
+                payload.session_id,
+            )
+            persisted_history = await run_in_threadpool(history_operation)
+            rag_history = _rag_history_messages(persisted_history)
+        except ChatSessionNotFoundError as exception:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exception),
+            ) from exception
+        except Exception as exception:
+            LOGGER.exception("The chat session history could not be loaded.")
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="The chat session history could not be loaded.",
+            ) from exception
+
     try:
         async with inference_lock:
-            operation = partial(
-                service.answer,
-                payload.question,
-                source_mode=payload.source_mode,
-                language_mode=payload.language_mode,
-            )
+            if rag_history is None:
+                operation = partial(
+                    service.answer,
+                    payload.question,
+                    source_mode=payload.source_mode,
+                    language_mode=payload.language_mode,
+                )
+            else:
+                operation = partial(
+                    _answer_with_history,
+                    service,
+                    question=payload.question,
+                    history=rag_history,
+                    source_mode=payload.source_mode,
+                    language_mode=payload.language_mode,
+                )
+
             rag_response = await run_in_threadpool(operation)
     except ValueError as exception:
         raise HTTPException(
@@ -524,18 +588,14 @@ async def chat(
             response=rag_response,
             session_id=payload.session_id,
         )
-        persisted = await run_in_threadpool(
-            persistence_operation
-        )
+        persisted = await run_in_threadpool(persistence_operation)
     except ChatSessionNotFoundError as exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exception),
         ) from exception
     except Exception as exception:
-        LOGGER.exception(
-            "The RAG exchange could not be persisted."
-        )
+        LOGGER.exception("The RAG exchange could not be persisted.")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from asyncio import Lock
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from fastapi import HTTPException, Request, status
 
 from phosprocess.rag.pipeline import PhosProcessRAG, load_runtime_config
-from phosprocess.rag.schemas import RAGResponse
+from phosprocess.rag.schemas import ChatMessage, RAGResponse, RAGStreamEvent
 
 
 class RAGService(Protocol):
@@ -32,6 +32,16 @@ class RAGService(Protocol):
         language_mode: str = "auto",
     ) -> RAGResponse:
         """Generate a grounded answer for one question."""
+
+    def stream_answer(
+        self,
+        question: str,
+        history: list[ChatMessage] | None = None,
+        *,
+        source_mode: str = "automatic",
+        language_mode: str = "auto",
+    ) -> Iterator[RAGStreamEvent]:
+        """Generate a grounded conversational answer from explicit history."""
 
     def close(self) -> None:
         """Release resources owned by the RAG service."""
