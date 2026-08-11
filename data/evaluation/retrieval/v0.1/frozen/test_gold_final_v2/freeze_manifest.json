@@ -1,0 +1,19 @@
+{
+  "status": "frozen_test_gold_final",
+  "benchmark": "phosprocess_retrieval",
+  "benchmark_version": "v0.1",
+  "snapshot": "test_gold_final_v2",
+  "approved_by": "user",
+  "frozen_at_utc": "2026-07-26T13:46:15.0526583Z",
+  "source_path": "data/evaluation/retrieval/v0.1/test_pool_v2/gold_evidence_test_verified_auto.jsonl",
+  "frozen_gold_path": "gold_evidence_test_verified_auto.jsonl",
+  "gold_sha256": "93C417B7AA6ECE47172FCC9197BCFB0AB3C84055AB782D073A739B1A64E95F99",
+  "total_questions": 28,
+  "answerable_questions": 24,
+  "unanswerable_questions": 4,
+  "human_gold_records": 16,
+  "automatic_gold_records": 12,
+  "manual_review_records": 0,
+  "final_test_evaluation_executed": false,
+  "note": "Gold TEST approuvé et figé avant l'unique évaluation TEST."
+}

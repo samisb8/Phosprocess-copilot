@@ -1,0 +1,122 @@
+ollama:
+  host: http://localhost:11434
+  model: qwen3:8b
+  temperature: 0.1
+  context_size: 8192
+  max_output_tokens: 1024
+  timeout_seconds: 120.0
+  keep_alive: 30m
+  seed: 0
+  num_gpu: 12
+
+response:
+  maximum_question_characters: 2000
+  source_excerpt_characters: 700
+
+conversation_memory:
+  enabled: true
+  strategy: summary_buffer
+  recent_turns: 2
+  summary_max_tokens: 300
+  recent_history_max_tokens: 500
+  total_history_max_tokens: 800
+  exclude_sources: true
+  exclude_retrieval_metadata: true
+  exclude_system_prompts: true
+  exclude_logs: true
+
+generation:
+  max_context_tokens_per_source: 650
+  max_total_document_context_tokens: 2600
+  maximum_answer_words: 350
+
+warmup:
+  enabled: true
+  embedding: true
+  reranker: true
+  ollama: true
+
+source_policy:
+  # Disabled for kb_quality_*; retained for rollback indexes with the same
+  # eight-document vocabulary as the quality router.
+  enabled: false
+
+  default_priority:
+    - 01_becker_phosphates_and_phosphoric_acid.pdf
+    - 02_chemical_engineering_thermodynamics_9e.pdf
+    - 03_fundamentals_heat_mass_transfer.pdf
+    - 04_rapport_atelier_acide_phosphorique.pdf
+    - 05_perrys_chemical_engineers_handbook_9e.pdf
+    - 06_mullin_crystallization_4e.pdf
+    - 07_process_dynamics_control_seborg_4e.pdf
+    - 08_transport_phenomena_bird_2e.pdf
+
+  domain_routes:
+    general:
+      preferred_sources:
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+        - 01_becker_phosphates_and_phosphoric_acid.pdf
+    phosphoric_acid:
+      preferred_sources:
+        - 01_becker_phosphates_and_phosphoric_acid.pdf
+        - 04_rapport_atelier_acide_phosphorique.pdf
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+    plant_specific:
+      preferred_sources:
+        - 04_rapport_atelier_acide_phosphorique.pdf
+        - 01_becker_phosphates_and_phosphoric_acid.pdf
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+    thermodynamics:
+      preferred_sources:
+        - 02_chemical_engineering_thermodynamics_9e.pdf
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+        - 04_rapport_atelier_acide_phosphorique.pdf
+    heat_transfer:
+      preferred_sources:
+        - 03_fundamentals_heat_mass_transfer.pdf
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+        - 04_rapport_atelier_acide_phosphorique.pdf
+    equipment:
+      preferred_sources:
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+        - 01_becker_phosphates_and_phosphoric_acid.pdf
+        - 04_rapport_atelier_acide_phosphorique.pdf
+    crystallization:
+      preferred_sources:
+        - 06_mullin_crystallization_4e.pdf
+        - 01_becker_phosphates_and_phosphoric_acid.pdf
+    control:
+      preferred_sources:
+        - 07_process_dynamics_control_seborg_4e.pdf
+        - 04_rapport_atelier_acide_phosphorique.pdf
+    transport:
+      preferred_sources:
+        - 08_transport_phenomena_bird_2e.pdf
+        - 05_perrys_chemical_engineers_handbook_9e.pdf
+
+  minimum_preferred_chunks: 2
+  allow_fallback: true
+
+quality_routing:
+  automatic_mode: soft_boost_only
+  maximum_source_boost: 0.06
+  hard_filter_only_when_explicit: true
+  explicit_modes:
+    - becker
+    - report
+    - thermodynamics
+    - heat_transfer
+    - perry
+    - crystallization
+    - control
+    - transport
+
+evidence_expansion:
+  enabled: true
+  neighbor_window: 1
+  include_parent: conditional
+  max_tokens_per_bundle: 650
+  max_total_context_tokens: 2600
+
+logging:
+  level: INFO

@@ -1,0 +1,297 @@
+catalog_version: quality-v1
+
+documents:
+  - document_id: becker_phosphates_and_phosphoric_acid
+    canonical_filename: 01_becker_phosphates_and_phosphoric_acid.pdf
+    source_filename: 01_becker_phosphates_and_phosphoric_acid.pdf
+    aliases:
+      - becker
+      - pierre becker
+      - phosphates and phosphoric acid
+    display_title: Phosphates and Phosphoric Acid
+    authors:
+      - Pierre Becker
+    edition: Second edition
+    language: en
+    document_type: process_reference
+    domains:
+      - phosphoric_acid_process
+      - crystallization
+      - equipment
+    subdomains:
+      - wet process
+      - phosphate reaction
+      - filtration
+      - phosphoric acid concentration
+      - evaporation
+      - gypsum
+    priority: 100
+    plant_specific: false
+    sha256: 1d148b7153f6ae634b9364cecf8c56079cc172c1699ffb1237ae0f1798e1e279
+    page_count: 301
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: smith_van_ness_chemical_engineering_thermodynamics
+    canonical_filename: 02_chemical_engineering_thermodynamics_9e.pdf
+    source_filename: 02_chemical_engineering_thermodynamics_9e.pdf
+    aliases:
+      - thermodynamics
+      - smith
+      - smith van ness
+      - introduction to chemical engineering thermodynamics
+    display_title: Introduction to Chemical Engineering Thermodynamics
+    authors:
+      - J. M. Smith
+      - H. C. Van Ness
+      - M. M. Abbott
+      - M. T. Swihart
+    edition: Ninth edition
+    language: en
+    document_type: thermodynamics_textbook
+    domains:
+      - thermodynamics
+      - general_chemical_engineering
+    subdomains:
+      - enthalpy
+      - entropy
+      - phase equilibrium
+      - vapor pressure
+      - boiling temperature
+      - mixtures
+      - vapor-liquid equilibrium
+    priority: 95
+    plant_specific: false
+    sha256: 635a47380915e7c5b7a0bc79e90b10b1bbc104236eb7022f429e217e2a9b834f
+    page_count: 781
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: incropera_fundamentals_heat_mass_transfer
+    canonical_filename: 03_fundamentals_heat_mass_transfer.pdf
+    source_filename: 03_fundamentals_heat_mass_transfer.pdf
+    aliases:
+      - heat_transfer
+      - incropera
+      - fundamentals of heat and mass transfer
+    display_title: Fundamentals of Heat and Mass Transfer
+    authors:
+      - Frank P. Incropera
+      - David P. DeWitt
+      - Theodore L. Bergman
+      - Adrienne S. Lavine
+    edition: Sixth edition
+    language: en
+    document_type: heat_transfer_textbook
+    domains:
+      - heat_transfer
+      - mass_transfer
+      - equipment
+    subdomains:
+      - conduction
+      - convection
+      - radiation
+      - boiling
+      - condensation
+      - heat exchangers
+      - transfer coefficients
+    priority: 95
+    plant_specific: false
+    sha256: 0f8152edeee168d94458401283f3a8546ef84943d249eea260f59ef27230cdfa
+    page_count: 1070
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: ocp_phosphoric_acid_workshop_report
+    canonical_filename: 04_rapport_atelier_acide_phosphorique.pdf
+    source_filename: 04_rapport_atelier_acide_phosphorique.pdf
+    aliases:
+      - report
+      - rapport
+      - rapport ocp
+      - rapport atelier
+      - rapport d'atelier
+      - atelier ocp
+      - rapport de l'atelier d'acide phosphorique
+      - jfc4 report
+      - ocp jfc4
+    display_title: Rapport de l’atelier d’acide phosphorique
+    authors:
+      - Auteur institutionnel non identifié
+    edition: Rapport d’installation
+    language: fr
+    document_type: plant_report
+    domains:
+      - plant_specific
+      - phosphoric_acid_process
+      - equipment
+      - instrumentation
+      - general_chemical_engineering
+      - thermodynamics
+      - heat_transfer
+      - mass_transfer
+      - fluid_mechanics
+    subdomains:
+      - wet-process phosphoric acid
+      - Jacobs dihydrate process
+      - acid concentration circuit
+      - installed equipment
+      - process flow and fluid circulation
+      - overall and component mass balances
+      - P2O5, water and fluorine balances
+      - energy and steam balances
+      - heat exchangers and LMTD
+      - boiling, vacuum and flash separation
+      - condenser heat and mass transfer
+      - fouling, washing and maintenance
+      - design versus actual performance
+      - operating conditions and shutdowns
+      - simulation and operating-point optimization
+      - plant instrumentation and terminology
+    priority: 100
+    plant_specific: true
+    sha256: 1ffbf46b22474350df0f810072bcfbc96a273ba7707e8947d225a699a771c8c1
+    page_count: 131
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: perrys_chemical_engineers_handbook
+    canonical_filename: 05_perrys_chemical_engineers_handbook_9e.pdf
+    source_filename: 05_perrys_chemical_engineers_handbook_9e.pdf
+    aliases:
+      - perry
+      - perrys chemical engineers handbook
+      - chemical engineers handbook
+    display_title: Perry’s Chemical Engineers’ Handbook
+    authors:
+      - Don W. Green
+      - Marylee Z. Southard
+    edition: Ninth edition
+    language: en
+    document_type: handbook
+    domains:
+      - general_chemical_engineering
+      - equipment
+      - safety
+      - heat_transfer
+      - mass_transfer
+      - fluid_mechanics
+    subdomains:
+      - pumps
+      - heat exchangers
+      - evaporators
+      - materials
+      - corrosion
+      - unit operations
+      - process safety
+    priority: 85
+    plant_specific: false
+    sha256: 56109c58a23cb9361ecee2f47d0bc1395bbd3d43cb05f1cc0f8e262922097118
+    page_count: 2273
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: mullin_crystallization
+    canonical_filename: 06_mullin_crystallization_4e.pdf
+    source_filename: 06_mullin_crystallization_4e.pdf
+    aliases:
+      - crystallization
+      - mullin
+      - mullin crystallization
+    display_title: Crystallization
+    authors:
+      - J. W. Mullin
+    edition: Fourth edition
+    language: en
+    document_type: crystallization_textbook
+    domains:
+      - crystallization
+      - general_chemical_engineering
+    subdomains:
+      - supersaturation
+      - nucleation
+      - crystal growth
+      - crystal size distribution
+      - precipitation
+      - operating conditions
+    priority: 95
+    plant_specific: false
+    sha256: ce4afbae4aea4a02d61c4a544e8bc46b6d4032051b36bbcdecd56a50631c2334
+    page_count: 610
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: extracted_successfully
+
+  - document_id: seborg_process_dynamics_control
+    canonical_filename: 07_process_dynamics_control_seborg_4e.pdf
+    source_filename: 07_process_dynamics_control_seborg_4e.pdf
+    aliases:
+      - control
+      - seborg
+      - process dynamics and control
+    display_title: Process Dynamics and Control
+    authors:
+      - Dale E. Seborg
+      - Thomas F. Edgar
+      - Duncan A. Mellichamp
+      - Francis J. Doyle III
+    edition: Fourth edition
+    language: en
+    document_type: process_control_textbook
+    domains:
+      - process_control
+      - mpc
+      - instrumentation
+    subdomains:
+      - dynamic modeling
+      - transient balances
+      - PID
+      - stability
+      - multivariable control
+      - model predictive control
+      - process monitoring
+    priority: 95
+    plant_specific: false
+    sha256: d89cc0bc454ac1c6d8527fec8c8745954c37f8949c9c3751119f8694e1736d33
+    page_count: 515
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text
+
+  - document_id: bird_transport_phenomena
+    canonical_filename: 08_transport_phenomena_bird_2e.pdf
+    source_filename: 08_transport_phenomena_bird_2e.pdf
+    aliases:
+      - transport
+      - bird
+      - transport phenomena
+    display_title: Transport Phenomena
+    authors:
+      - R. Byron Bird
+      - Warren E. Stewart
+      - Edwin N. Lightfoot
+    edition: Second edition
+    language: en
+    document_type: transport_textbook
+    domains:
+      - fluid_mechanics
+      - heat_transfer
+      - mass_transfer
+    subdomains:
+      - momentum transport
+      - diffusion
+      - boundary layers
+      - pipe flow
+      - conservation equations
+    priority: 95
+    plant_specific: false
+    sha256: d4ed05d732dd965d9b10786a77d17666258699ee9532529bf151b62bac7ab60d
+    page_count: 934
+    ingestion_version: quality-v1
+    active: true
+    extraction_status: native_text

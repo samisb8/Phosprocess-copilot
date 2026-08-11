@@ -1,0 +1,10 @@
+strategy: structure_aware
+tokenizer_name: BAAI/bge-m3
+
+target_tokens: 500
+max_tokens: 700
+overlap_tokens: 80
+min_chunk_tokens: 80
+
+include_document_context: true
+pipeline_version: "0.1.0"

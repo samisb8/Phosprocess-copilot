@@ -1,0 +1,12 @@
+{
+  "opened_at": "2026-08-10T17:11:30.542454+00:00",
+  "opening_count": 1,
+  "baseline_sha256": "5c7bfba970cdc1a14e928fffe823c8bceb87701eb8eefe4f4e3f4f46cfcbf16e",
+  "protocol_sha256": "1a5a3119360766cb4767579e1cb7d368e8b13232db0023422ed10829b6d91cfa",
+  "evaluator_sha256": "648e99fc7df3f6f8cbadd516506e8f5f895a5240ace5e19c1b3ebfe89c1f850f",
+  "evaluator_freeze_sha256": "5d7b5b17cab126a55b6670995b5be6ee75fe8e109f3358f0594be309bb24dcaa",
+  "policy_frozen_before_open": true,
+  "status": "complete",
+  "completed_at": "2026-08-10T17:22:43.553803+00:00",
+  "question_count": 19
+}

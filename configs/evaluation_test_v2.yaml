@@ -1,0 +1,64 @@
+dataset:
+  name: phosprocess_retrieval_test_pool_v2
+  version: '0.1'
+  schema_version: '1.0'
+  output_directory: data/evaluation/retrieval/v0.1/test_pool_v2
+  queries_filename: queries.jsonl
+  judgments_filename: judgments.jsonl
+  manifest_filename: manifest.json
+  validation_report_filename: validation_report.json
+expected:
+  total_queries: 48
+  answerable_queries: 40
+  unanswerable_queries: 8
+  splits:
+    dev: 20
+    test: 28
+  categories:
+    exact_numeric: 8
+    causal_mechanism: 8
+    process_description: 6
+    operator_diagnosis: 6
+    process_comparison: 4
+    table_data: 4
+    impurities_losses_corrosion: 4
+    unanswerable: 8
+  answerable_languages:
+    fr: 28
+    en: 8
+    mixed: 4
+  unanswerable_languages:
+    fr: 6
+    en: 2
+    mixed: 0
+  all_languages:
+    fr: 34
+    en: 10
+    mixed: 4
+annotation:
+  relevance_minimum: 0
+  relevance_maximum: 3
+  binary_relevance_threshold: 2
+  require_rationale: true
+  labels:
+    0: non_relevant
+    1: useful_context
+    2: relevant_partial
+    3: directly_answering
+pooling:
+  dense_depth: 20
+  bm25_depth: 20
+  hybrid_depth: 20
+  reranker_depth: 15
+metrics:
+  candidate_retrieval:
+  - recall@5
+  - recall@10
+  - recall@15
+  final_ranking:
+  - ndcg@5
+  - mrr@5
+  - precision@5
+  - recall@5
+  - hit_rate@1
+pipeline_version: 0.2.0

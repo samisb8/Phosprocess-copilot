@@ -1,0 +1,4 @@
+﻿variant_id,label,lexical_slots,complexity,candidate_recall_at_20,evidence_recall_at_5,hit_at_5,mrr_at_5,hit_at_1,delta_candidate_recall_at_20,delta_evidence_recall_at_5,delta_hit_at_5,delta_mrr_at_5,delta_hit_at_1,median_policy_latency_us,metrics_identical_across_runs,eligible_candidate_recall,selection_rank,selected
+strict_lexical_slots_0,plus_stricte,0,0,1.0,0.9375,0.9375,0.7760416666666666,0.6875,0.0,0.0,0.0,0.0,0.0,51.349999999999994,True,True,2,False
+lexical_safeguard_001,actuelle,1,1,1.0,1.0,1.0,0.7885416666666667,0.6875,0.0,0.0625,0.0625,0.012500000000000067,0.0,35.099999999999994,True,True,1,True
+permissive_lexical_slots_2,plus_permissive,2,2,1.0,0.9375,0.9375,0.7760416666666666,0.6875,0.0,0.0,0.0,0.0,0.0,31.900000000000002,True,True,3,False

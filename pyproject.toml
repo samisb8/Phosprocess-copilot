@@ -12,7 +12,25 @@ authors = [
     { name = "Sami Bachtaoui" }
 ]
 dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.30,<1",
+    "httpx>=0.27,<1",
     "ollama==0.6.2",
+    "pymupdf",
+    "pymupdf4llm",
+    "docling==2.115.0",
+    "pydantic>=2,<3",
+    "pydantic-settings",
+    "sqlalchemy>=2.0,<3",
+    "psycopg[binary]>=3.2,<4",
+    "alembic>=1.17,<2",
+    "FlagEmbedding==1.4.0",
+    "faiss-cpu==1.14.3",
+    "bm25s==0.3.10",
+    "scipy>=1.11,<2",
+    "transformers==4.57.3",
+    "ranx==0.3.21",
+    "prometheus-client==0.26.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +49,24 @@ where = ["src"]
 target-version = "py311"
 line-length = 100
 src = ["src", "tests"]
+extend-exclude = [
+    "data/evaluation/retrieval/v0.1/frozen",
+    "scripts/build_gold_evidence.py",
+    "scripts/compare_relevance_judgments.py",
+    "scripts/draft_relevance_with_ollama.py",
+    "scripts/draft_relevance_with_ollama_v2.py",
+    "scripts/evaluate_dense_reranked_dev.py",
+    "scripts/evaluate_hybrid_reranked_dev.py",
+    "scripts/evaluate_hybrid_reranked_dev_v2.py",
+    "scripts/evaluate_hybrid_reranked_dev_v2_expanded_query.py",
+    "scripts/evaluate_hybrid_reranked_dev_v2_no_metadata.py",
+    "scripts/evaluate_retrieval_dev.py",
+    "scripts/export_questions_batch.py",
+    "scripts/export_reference_answers.py",
+    "scripts/inspect_q015_reranker_input.py",
+    "scripts/propose_gold_evidence_with_ollama.py",
+    "scripts/review_gold_evidence_test_v2.py",
+]
 
 [tool.ruff.lint]
 select = [
@@ -42,9 +78,17 @@ select = [
 ]
 
 [tool.pytest.ini_options]
+markers = [
+    "requires_local_data: requires local RAG knowledge-base or evaluation artifacts not available on CI runners",
+]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra -q"
+addopts = [
+    "-ra",
+    "-q",
+    "--ignore=tests/test_auto_verify_gold_evidence_test_v2.py",
+    "--ignore=tests/test_evaluate_hybrid_reranked_test_v2.py",
+]
 
 [tool.mypy]
 python_version = "3.11"

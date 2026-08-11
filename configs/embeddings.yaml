@@ -1,0 +1,26 @@
+model:
+  name: BAAI/bge-m3
+  dimension: 1024
+  device: auto
+  use_fp16: true
+  normalize_embeddings: true
+  trust_remote_code: false
+  cache_dir: null
+
+inference:
+  batch_size: 4
+  passage_max_length: 768
+  query_max_length: 256
+
+data:
+  chunks_directory: data/processed/final_chunks
+
+index:
+  type: IndexFlatIP
+  metric: inner_product
+  output_directory: data/indexes/dense/bge_m3
+  index_filename: index.faiss
+  metadata_filename: metadata.jsonl
+  manifest_filename: manifest.json
+
+pipeline_version: "0.1.0"

@@ -1,0 +1,21 @@
+{
+  "split": "dev",
+  "answerable_queries_only": true,
+  "top_k": 40,
+  "dense_candidates": 20,
+  "bm25_candidates": 20,
+  "summaries": [
+    {
+      "method": "hybrid",
+      "queries_evaluated": 16,
+      "top_k": 40,
+      "hit_at_1": 0.125,
+      "hit_at_5": 0.5,
+      "mrr_at_5": 0.22291666666666665,
+      "evidence_recall_at_5": 0.5,
+      "mean_latency_ms": 94.9738250055816,
+      "median_latency_ms": 43.93540002638474,
+      "p95_latency_ms": 859.3946000328287
+    }
+  ]
+}

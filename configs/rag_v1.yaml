@@ -1,0 +1,126 @@
+rag_version: "1.0.0"
+status: frozen
+freeze_date: "2026-08-10"
+
+knowledge_base:
+  version: kb_quality_20260809_015038
+  catalog: configs/knowledge_base_catalog.yaml
+  document_count: 8
+  page_count: 6615
+  chunk_count: 24085
+
+runtime:
+  config: configs/rag_production.yaml
+
+generation:
+  model: qwen3:8b
+  prompt_family: phase10_baseline
+  temperature: 0.1
+  seed: 0
+  context_size: 8192
+  max_output_tokens: 1024
+  keep_alive: 30m
+  thinking: false
+  calls_per_documentary_answer: 1
+
+conversation_resolver:
+  version: structured-query-resolver-v1
+  schema: strict_json
+  history_role: understanding_only
+  history_is_evidence: false
+  answer_field_allowed: false
+
+retrieval:
+  selected_variant: lexical_safeguard_001
+  historical_snapshot_sha256: 090C0CC191317DF0CBF068725144FEA567995EFD0E7EAE64EE1EB8DD9006A4EE
+  candidate_k: 20
+  dense_candidates: 20
+  sparse_candidates: 50
+  bm25_candidates: 20
+  query_expansion: true
+  top_k: 5
+  lexical_slots: 1
+  reranker_leading_slots: 4
+  lexical_source: bm25
+  duplicate_policy: skip
+  fallback: next_reranker_result
+  config: configs/retrieval_v2.yaml
+  config_sha256: 04de6ef85b34c0e7d61aa9904392874db136f2c7ffd62dc2129f0c59efc37c12
+  safeguard_config: configs/lexical_safeguard_v3.yaml
+  safeguard_sha256: f0541ee50a8b909568196b7c1917812bb5661cb3f02c571ed4687af44b85f228
+
+embedding:
+  dense_model: BAAI/bge-m3
+  sparse_model: BAAI/bge-m3
+  dimension: 1024
+  normalized: true
+
+bm25:
+  method: lucene
+  k1: 1.2
+  b: 0.75
+  tokenizer: technical_v1
+
+fusion:
+  method: rrf
+  rrf_k: 60
+  dense_weight: 1.0
+  bm25_weight: 1.0
+  dynamic_colbert: true
+
+reranker:
+  model: BAAI/bge-reranker-v2-m3
+  candidate_depth: 30
+  config: configs/reranking.yaml
+  config_sha256: 3a8da7f3bffd9592cfcc7a1139ae738b0fc919b49ead3b652c5e81eea761c0b0
+
+source_lock:
+  explicit_source_wins: true
+  automatic_discovery_before_lock: true
+  cross_document_leakage_allowed: false
+
+context_engine:
+  representation: EvidenceBundle
+  max_tokens_per_source: 650
+  max_total_document_context_tokens: 2600
+  neighbor_window: 1
+  include_parent: conditional
+
+objective_validation:
+  citation_syntax: true
+  cited_source_membership: true
+  source_lock_metadata: true
+  controlled_insufficiency: true
+  semantic_judge: false
+  verifier: false
+  repair_loop: false
+
+inactive_components:
+  - phase11_stricter_prompt
+  - phase12_evidence_planner
+  - evidence_judge
+  - semantic_verifier
+  - citation_repair_loop
+  - region_aware_candidate_expansion
+  - deterministic_answer_contracts
+  - new_retrieval
+  - rechunking
+  - fine_tuning
+
+artifacts:
+  final_evaluation: data/evaluation/rag_v1/v1.0
+  latency_profile: data/evaluation/rag_v1/v1.0/latency/latency_optimized.json
+  hashes:
+    runtime_config: fd6dc274d8d2fa80a699c1e3afef90d3361d702129c7d47e9be0f751d883cd6b
+    knowledge_base_catalog: c738cf28c680aabf39a8e3e065b647f6c0c7b08f23624eb88fe8f90549537558
+    current_knowledge_base_pointer: 3e80edae0190d719605005b975ec88513dcb0fe452fd539af09699b2b69fa5ed
+    retrieval_config: 04de6ef85b34c0e7d61aa9904392874db136f2c7ffd62dc2129f0c59efc37c12
+    reranker_config: 3a8da7f3bffd9592cfcc7a1139ae738b0fc919b49ead3b652c5e81eea761c0b0
+    lexical_safeguard_config: f0541ee50a8b909568196b7c1917812bb5661cb3f02c571ed4687af44b85f228
+    prompt_module: e40008c4efb7c2f9e770d919b6bda35effa14a0a987fe926dec44be201f85836
+    generation_system_prompt: f273467a7b1f5f9d795cea37545aeab09d58db3e7d1f42f0dc1a8d514065aa33
+    streaming_system_prompt: b9908744000241c0c656412fd908403271fbe3d3e546a816a1b498e55d0592dd
+    conversation_resolver: 68b876d2abf42cd43ef4bf3e16ff2f6442c6774fe66ca6266dd9c603906f8d3d
+    evaluation_questions: 5ccb134be5939751c69607ed53aed393ca5a0dfbbb9dd00ce3482b36dd174423
+    evidence_sets: a7cf4d7f7f9a3e26ce9e21b620a1a8e582bfb7e6aab8b4bcd15502c42ea8b9bb
+    final_model_decision: 7c4f4be3139e8442645548100e80f7b8e25ad13b8c2e1f89a91a9274d79eab6c

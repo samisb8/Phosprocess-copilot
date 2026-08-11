@@ -1,0 +1,43 @@
+{
+  "version": "generation_baseline_v0.1",
+  "frozen_before_generation": true,
+  "gold_visibility": "evaluation_after_generation_only",
+  "claim_extraction": "deterministic atomic sentence/list splitter; extraction only",
+  "claim_labels": [
+    "SUPPORTED",
+    "PARTIALLY_SUPPORTED",
+    "UNSUPPORTED"
+  ],
+  "completeness_labels": [
+    "COMPLETE",
+    "MOSTLY_COMPLETE",
+    "PARTIAL",
+    "MISSED"
+  ],
+  "evidence_use_labels": [
+    "YES",
+    "PARTIAL",
+    "NO"
+  ],
+  "failure_taxonomy": {
+    "A": "RETRIEVAL_MISS",
+    "B": "CONTEXT_PACKING_MISS",
+    "C": "GENERATION_OMISSION",
+    "D": "UNSUPPORTED_ADDITION",
+    "E": "CITATION_ERROR",
+    "F": "NUMERIC_ERROR",
+    "G": "STRUCTURE_ORDER_ERROR",
+    "H": "LANGUAGE_ERROR",
+    "I": "CORRECT_REFUSAL",
+    "J": "INCORRECT_REFUSAL",
+    "K": "SHOULD_HAVE_REFUSED_BUT_ANSWERED"
+  },
+  "citation_validity": "syntactically valid citations resolving to an existing bundle in the locked document",
+  "citation_precision": "manually supported claims among claims carrying a valid citation",
+  "citation_coverage": "important factual claims carrying at least one valid citation",
+  "numeric_grounding": "answer numbers found in the cited documentary wording",
+  "unit_grounding": "answer units preserved in the cited documentary wording",
+  "holdout_policy": "protocol and evaluator code frozen on DEV before one holdout opening",
+  "production_thresholds_added": false,
+  "semantic_judge_used": false
+}
