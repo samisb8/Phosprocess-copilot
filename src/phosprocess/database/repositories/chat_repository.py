@@ -29,9 +29,7 @@ class ChatSessionNotFoundError(LookupError):
 
     def __init__(self, session_id: UUID) -> None:
         self.session_id = session_id
-        super().__init__(
-            f"Chat session '{session_id}' was not found."
-        )
+        super().__init__(f"Chat session '{session_id}' was not found.")
 
 
 class ChatRepository:
@@ -77,19 +75,11 @@ class ChatRepository:
 
         statement = (
             select(ChatSession)
-            .options(
-                selectinload(
-                    ChatSession.messages
-                ).selectinload(
-                    ChatMessage.citations
-                )
-            )
+            .options(selectinload(ChatSession.messages).selectinload(ChatMessage.citations))
             .where(ChatSession.id == session_id)
         )
 
-        chat_session = self._database_session.scalar(
-            statement
-        )
+        chat_session = self._database_session.scalar(statement)
 
         if chat_session is None:
             raise ChatSessionNotFoundError(session_id)
@@ -99,9 +89,7 @@ class ChatRepository:
     def count_sessions(self) -> int:
         """Return the total number of persisted conversations."""
 
-        total = self._database_session.scalar(
-            select(func.count()).select_from(ChatSession)
-        )
+        total = self._database_session.scalar(select(func.count()).select_from(ChatSession))
 
         return int(total or 0)
 

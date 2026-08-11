@@ -87,10 +87,7 @@ def get_database_session_factory(
 
     runtime_state = get_database_runtime_state(request)
 
-    if (
-        not runtime_state.ready
-        or runtime_state.session_factory is None
-    ):
+    if not runtime_state.ready or runtime_state.session_factory is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service is not ready.",
@@ -104,9 +101,7 @@ def get_chat_session_management_service(
 ) -> ChatSessionManagementService:
     """Build the transactional session-management service."""
 
-    return ChatSessionManagementService(
-        get_database_session_factory(request)
-    )
+    return ChatSessionManagementService(get_database_session_factory(request))
 
 
 def get_chat_session_listing_service(
@@ -114,9 +109,7 @@ def get_chat_session_listing_service(
 ) -> ChatSessionListingService:
     """Build the paginated conversation-listing service."""
 
-    return ChatSessionListingService(
-        get_database_session_factory(request)
-    )
+    return ChatSessionListingService(get_database_session_factory(request))
 
 
 def get_chat_history_service(
@@ -124,9 +117,7 @@ def get_chat_history_service(
 ) -> ChatHistoryService:
     """Build the read-only chat history service."""
 
-    return ChatHistoryService(
-        get_database_session_factory(request)
-    )
+    return ChatHistoryService(get_database_session_factory(request))
 
 
 def get_chat_persistence_service(
@@ -134,6 +125,4 @@ def get_chat_persistence_service(
 ) -> ChatPersistenceService:
     """Build the transactional chat persistence service."""
 
-    return ChatPersistenceService(
-        get_database_session_factory(request)
-    )
+    return ChatPersistenceService(get_database_session_factory(request))

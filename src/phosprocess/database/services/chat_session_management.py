@@ -28,14 +28,10 @@ def _normalize_title(title: str) -> str:
     normalized = " ".join(title.split())
 
     if not normalized:
-        raise ValueError(
-            "The chat session title must not be empty."
-        )
+        raise ValueError("The chat session title must not be empty.")
 
     if len(normalized) > 200:
-        raise ValueError(
-            "The chat session title must not exceed 200 characters."
-        )
+        raise ValueError("The chat session title must not exceed 200 characters.")
 
     return normalized
 

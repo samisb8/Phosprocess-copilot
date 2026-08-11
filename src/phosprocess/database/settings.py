@@ -35,9 +35,7 @@ class DatabaseSettings(BaseSettings):
             raise ValueError("DATABASE_URL is required.")
 
         if not raw_url.startswith("postgresql+psycopg://"):
-            raise ValueError(
-                "DATABASE_URL must use postgresql+psycopg://."
-            )
+            raise ValueError("DATABASE_URL must use postgresql+psycopg://.")
 
         return SecretStr(raw_url)
 

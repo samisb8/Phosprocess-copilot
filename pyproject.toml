@@ -30,6 +30,7 @@ dependencies = [
     "scipy>=1.11,<2",
     "transformers==4.57.3",
     "ranx==0.3.21",
+    "prometheus-client==0.26.0",
 ]
 
 [project.optional-dependencies]

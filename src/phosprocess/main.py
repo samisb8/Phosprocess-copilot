@@ -1,4 +1,4 @@
-﻿"""Main entry point for PhosProcess Copilot."""
+"""Main entry point for PhosProcess Copilot."""
 
 
 def get_project_name() -> str:

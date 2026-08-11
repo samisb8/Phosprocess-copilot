@@ -107,10 +107,7 @@ def _map_message(
         response_language=message.response_language,
         question_type=message.question_type,
         total_ms=message.total_ms,
-        citations=tuple(
-            _map_citation(citation)
-            for citation in message.citations
-        ),
+        citations=tuple(_map_citation(citation) for citation in message.citations),
     )
 
 
@@ -124,10 +121,7 @@ def _map_session(
         title=chat_session.title,
         created_at=chat_session.created_at,
         updated_at=chat_session.updated_at,
-        messages=tuple(
-            _map_message(message)
-            for message in chat_session.messages
-        ),
+        messages=tuple(_map_message(message) for message in chat_session.messages),
     )
 
 
@@ -148,10 +142,6 @@ class ChatHistoryService:
 
         with self._session_factory() as database_session:
             repository = ChatRepository(database_session)
-            chat_session = (
-                repository.require_session_with_history(
-                    session_id
-                )
-            )
+            chat_session = repository.require_session_with_history(session_id)
 
             return _map_session(chat_session)

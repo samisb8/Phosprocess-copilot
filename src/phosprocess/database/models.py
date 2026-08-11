@@ -174,10 +174,7 @@ class MessageCitation(Base):
         UniqueConstraint(
             "message_id",
             "source_number",
-            name=(
-                "uq_message_citations_"
-                "message_source_number"
-            ),
+            name=("uq_message_citations_message_source_number"),
         ),
     )
 

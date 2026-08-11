@@ -20,10 +20,7 @@ class ChatRequest(BaseModel):
     )
     session_id: UUID | None = Field(
         default=None,
-        description=(
-            "Existing conversation identifier. "
-            "Omit it to create a new conversation."
-        ),
+        description=("Existing conversation identifier. Omit it to create a new conversation."),
     )
     source_mode: str = Field(
         default="automatic",
@@ -91,9 +88,7 @@ class ChatSessionRenameRequest(BaseModel):
         stripped = value.strip()
 
         if not stripped:
-            raise ValueError(
-                "The chat session title must not be empty."
-            )
+            raise ValueError("The chat session title must not be empty.")
 
         return stripped
 
@@ -125,9 +120,7 @@ class ChatSessionListResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    items: list[ChatSessionSummaryResponse] = Field(
-        default_factory=list
-    )
+    items: list[ChatSessionSummaryResponse] = Field(default_factory=list)
     total: int = Field(ge=0)
     limit: int = Field(ge=1, le=100)
     offset: int = Field(ge=0)
@@ -170,9 +163,7 @@ class ChatHistoryMessageResponse(BaseModel):
     response_language: str | None = None
     question_type: str | None = None
     total_ms: float | None = Field(default=None, ge=0)
-    citations: list[ChatHistoryCitationResponse] = Field(
-        default_factory=list
-    )
+    citations: list[ChatHistoryCitationResponse] = Field(default_factory=list)
 
 
 class ChatSessionHistoryResponse(BaseModel):
@@ -184,9 +175,7 @@ class ChatSessionHistoryResponse(BaseModel):
     title: str | None = None
     created_at: datetime
     updated_at: datetime
-    messages: list[ChatHistoryMessageResponse] = Field(
-        default_factory=list
-    )
+    messages: list[ChatHistoryMessageResponse] = Field(default_factory=list)
 
 
 class ChatTimingsResponse(BaseModel):

@@ -31,7 +31,13 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">P</div>
+        <div className="brand-logo">
+          <img
+            src="/assets/ocp_logo.png"
+            alt="OCP Group"
+          />
+        </div>
+
         <div>
           <strong>PhosProcess</strong>
           <span>Industrial Copilot</span>
@@ -43,7 +49,7 @@ export function Sidebar({
         type="button"
         onClick={onNewChat}
       >
-        <span aria-hidden="true">＋</span>
+        <span aria-hidden="true">+</span>
         Nouveau chat
       </button>
 
@@ -55,7 +61,7 @@ export function Sidebar({
       <div className="session-list">
         {loading && (
           <p className="sidebar-placeholder">
-            Chargement des conversations…
+            Chargement des conversations...
           </p>
         )}
 
@@ -66,7 +72,8 @@ export function Sidebar({
         )}
 
         {sessions.map((session) => {
-          const active = session.session_id === activeSessionId
+          const active =
+            session.session_id === activeSessionId
 
           return (
             <div

@@ -57,21 +57,15 @@ def _build_rag_metadata(
 
     return {
         "selected_variant": response.selected_variant,
-        "knowledge_base_snapshot_sha256": (
-            response.snapshot_sha256
-        ),
+        "knowledge_base_snapshot_sha256": (response.snapshot_sha256),
         "candidate_count": response.candidate_count,
         "selected_count": response.selected_count,
-        "cited_source_numbers": list(
-            response.cited_source_numbers
-        ),
+        "cited_source_numbers": list(response.cited_source_numbers),
         "source_policy": {
             "route": response.source_policy_route,
             "mode": response.source_policy_mode,
             "primary": response.source_policy_primary,
-            "fallback_used": (
-                response.source_policy_fallback_used
-            ),
+            "fallback_used": (response.source_policy_fallback_used),
             "forced": response.source_policy_forced,
         },
         "standalone_query": response.standalone_query,
@@ -84,10 +78,7 @@ def _build_rag_metadata(
             "first_token_ms": response.timings.first_token_ms,
         },
         "latency": dict(response.latency),
-        "source_diagnostics": [
-            _build_source_diagnostic(source)
-            for source in response.sources
-        ],
+        "source_diagnostics": [_build_source_diagnostic(source) for source in response.sources],
     }
 
 
@@ -113,14 +104,10 @@ class ChatPersistenceService:
 
             if session_id is None:
                 chat_session = repository.create_session(
-                    title=_build_session_title(
-                        response.question
-                    )
+                    title=_build_session_title(response.question)
                 )
             else:
-                chat_session = repository.require_session(
-                    session_id
-                )
+                chat_session = repository.require_session(session_id)
 
             user_message = repository.add_message(
                 ChatMessage(
@@ -136,22 +123,16 @@ class ChatPersistenceService:
                     session=chat_session,
                     role="assistant",
                     content=response.answer,
-                    insufficient_context=(
-                        response.insufficient_context
-                    ),
+                    insufficient_context=(response.insufficient_context),
                     model_name=response.model_name,
-                    response_language=(
-                        response.response_language
-                    ),
+                    response_language=(response.response_language),
                     question_type=response.question_type,
                     total_ms=response.timings.total_ms,
                     rag_metadata=_build_rag_metadata(response),
                 )
             )
 
-            cited_numbers = set(
-                response.cited_source_numbers
-            )
+            cited_numbers = set(response.cited_source_numbers)
 
             for source in response.sources:
                 repository.add_citation(
@@ -163,19 +144,14 @@ class ChatPersistenceService:
                         pages=list(source.pages),
                         section=source.section,
                         excerpt=source.excerpt,
-                        document_title=(
-                            source.document_title
-                        ),
+                        document_title=(source.document_title),
                         filename=source.filename,
                         chapter=source.chapter,
                         page_start=source.page_start,
                         page_end=source.page_end,
                         domain=source.domain,
                         chunk_type=source.chunk_type,
-                        is_cited=(
-                            source.source_number
-                            in cited_numbers
-                        ),
+                        is_cited=(source.source_number in cited_numbers),
                     )
                 )
 

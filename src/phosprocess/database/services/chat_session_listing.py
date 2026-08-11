@@ -69,14 +69,10 @@ class ChatSessionListingService:
         """Return conversations ordered by latest activity."""
 
         if not 1 <= limit <= 100:
-            raise ValueError(
-                "The limit must be between 1 and 100."
-            )
+            raise ValueError("The limit must be between 1 and 100.")
 
         if offset < 0:
-            raise ValueError(
-                "The offset must be greater than or equal to zero."
-            )
+            raise ValueError("The offset must be greater than or equal to zero.")
 
         with self._session_factory() as database_session:
             repository = ChatRepository(database_session)
@@ -88,10 +84,7 @@ class ChatSessionListingService:
             )
 
             return ChatSessionPage(
-                items=tuple(
-                    _map_summary(record)
-                    for record in records
-                ),
+                items=tuple(_map_summary(record) for record in records),
                 total=total,
                 limit=limit,
                 offset=offset,

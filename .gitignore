@@ -107,3 +107,11 @@ data/evaluation/**/results/*_per_query.csv
 data/evaluation/**/v3/experiments/
 data/evaluation/**/v3/analysis/
 data/evaluation/**/v3/robustness/*_per_query.csv
+.env.compose
+
+# Local development backups / scratch
+*.before-*
+*.before_*
+_mlops_audit/
+apply_readiness_fix.py
+data/knowledge_base/quarantine/
