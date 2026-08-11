@@ -78,6 +78,9 @@ select = [
 ]
 
 [tool.pytest.ini_options]
+markers = [
+    "requires_local_data: requires local RAG knowledge-base or evaluation artifacts not available on CI runners",
+]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = [

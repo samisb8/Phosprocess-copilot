@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from phosprocess.evaluation.context_engine_v01 import read_jsonl
 from phosprocess.evaluation.final_model_capability_v01 import (
     CANDIDATE_MODEL,
@@ -29,6 +31,7 @@ class _FakeLLM:
         yield "Réponse documentaire [Source 1]."
 
 
+@pytest.mark.requires_local_data
 def test_final_model_replay_changes_only_model() -> None:
     baseline = read_jsonl(PHASE10_OUTPUT / "dev_generation_results.jsonl")[0]
     llm = _FakeLLM()

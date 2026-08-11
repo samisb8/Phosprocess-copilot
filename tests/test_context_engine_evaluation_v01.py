@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 from phosprocess.evaluation.context_engine_v01 import (
     ACTIVE_VERSION,
     _coverage,
@@ -44,6 +46,7 @@ def bundle(text: str, supporting: tuple[str, ...]) -> EvidenceBundle:
     )
 
 
+@pytest.mark.requires_local_data
 def test_phase5_dataset_covers_documents_languages_and_requested_types() -> None:
     chunks_path = (
         PROJECT_ROOT

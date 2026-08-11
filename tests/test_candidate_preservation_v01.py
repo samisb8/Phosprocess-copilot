@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from phosprocess.evaluation.candidate_preservation_v01 import (
     DATASET_SIZE,
     HOLDOUT_SIZE,
@@ -63,6 +65,7 @@ def test_contribution_classes_are_mutually_exclusive() -> None:
     ) == "fusion_rescue"
 
 
+@pytest.mark.requires_local_data
 def test_verified_dataset_has_64_real_gold_questions_and_frozen_split() -> None:
     rows = build_verified_dataset()
 

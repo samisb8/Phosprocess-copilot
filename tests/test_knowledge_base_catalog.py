@@ -41,6 +41,7 @@ def test_catalog_assigns_domains_explicitly() -> None:
     assert documents["ocp_phosphoric_acid_workshop_report"].plant_specific is True
 
 
+@pytest.mark.requires_local_data
 def test_catalog_matches_all_observed_pdf_hashes_and_page_counts() -> None:
     catalog = load_document_catalog()
     results = verify_catalogue_sources(catalog)

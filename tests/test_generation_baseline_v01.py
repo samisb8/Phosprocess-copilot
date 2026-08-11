@@ -5,6 +5,8 @@ from __future__ import annotations
 import inspect
 import json
 
+import pytest
+
 from phosprocess.evaluation.generation_baseline_v01 import (
     FOLLOWUP_CONVERSATIONS,
     PRODUCTION_BASELINE_FILES,
@@ -16,6 +18,7 @@ from phosprocess.evaluation.generation_baseline_v01 import (
 )
 
 
+@pytest.mark.requires_local_data
 def test_question_snapshot_preserves_frozen_primary_splits() -> None:
     questions = _load_question_snapshot()
     primary = [item for item in questions if item["dataset_scope"] == "phase8_primary"]
@@ -29,6 +32,7 @@ def test_question_snapshot_preserves_frozen_primary_splits() -> None:
     assert language_counts == {"fr": 46, "en": 12, "ar": 6}
 
 
+@pytest.mark.requires_local_data
 def test_supplemental_set_contains_three_absent_questions_and_process_case() -> None:
     supplemental = [
         item

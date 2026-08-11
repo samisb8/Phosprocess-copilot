@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -43,7 +43,7 @@ jobs:
         run: python -m ruff check src tests
 
       - name: Pytest
-        run: python -m pytest -q
+        run: python -m pytest -q -m "not requires_local_data"
 
   frontend:
     name: Frontend - Production build
@@ -56,7 +56,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate Docker Compose
         run: docker compose --env-file .env.compose.example config --quiet

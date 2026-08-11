@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from phosprocess.evaluation.retriever_forensics_v01 import (
     aggregate_retriever_ids,
     build_traces,
@@ -38,6 +40,7 @@ def _raw() -> dict[str, object]:
     }
 
 
+@pytest.mark.requires_local_data
 def test_frozen_primary_cohort_matches_phase5_denominator() -> None:
     traces = build_traces()
     primary = [trace for trace in traces if trace["cohort"] == "primary"]

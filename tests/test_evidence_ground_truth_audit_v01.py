@@ -16,6 +16,7 @@ def phase8_results() -> dict:
     return build_phase8_results()
 
 
+@pytest.mark.requires_local_data
 def test_all_64_questions_receive_one_manual_audit(phase8_results: dict) -> None:
     assert phase8_results["dataset"] == {
         "question_count": 64,
@@ -28,6 +29,7 @@ def test_all_64_questions_receive_one_manual_audit(phase8_results: dict) -> None
     assert len(phase8_results["annotations"]) == 64
 
 
+@pytest.mark.requires_local_data
 def test_every_curated_evidence_id_exists_in_active_corpus(phase8_results: dict) -> None:
     active_ids = {
         chunk.chunk_id for chunk in read_child_chunks(ACTIVE_DIRECTORY / "chunks.jsonl")
@@ -36,6 +38,7 @@ def test_every_curated_evidence_id_exists_in_active_corpus(phase8_results: dict)
         assert set(annotation["region_chunk_ids"]) <= active_ids
 
 
+@pytest.mark.requires_local_data
 def test_evidence_set_recall_exceeds_exact_recall(phase8_results: dict) -> None:
     current = phase8_results["metrics"]["all"]["current"]
     candidate = phase8_results["metrics"]["all"]["phase7_candidate"]
@@ -45,6 +48,7 @@ def test_evidence_set_recall_exceeds_exact_recall(phase8_results: dict) -> None:
     assert candidate["evidence_set_recall_at_20"] == pytest.approx(0.9375)
 
 
+@pytest.mark.requires_local_data
 def test_complementary_evidence_requires_every_group() -> None:
     _records, annotations = build_manual_annotations()
     evidence_sets = annotations["DQ039"]["valid_evidence_sets"]
@@ -55,6 +59,7 @@ def test_complementary_evidence_requires_every_group() -> None:
     assert _evidence_coverage(evidence_sets, [evaporator, mpc]) == 1.0
 
 
+@pytest.mark.requires_local_data
 def test_true_hard_misses_are_manually_verified_pool_misses(
     phase8_results: dict,
 ) -> None:
@@ -68,6 +73,7 @@ def test_true_hard_misses_are_manually_verified_pool_misses(
     )
 
 
+@pytest.mark.requires_local_data
 def test_holdout_label_changes_are_explicit(phase8_results: dict) -> None:
     assert {
         item["question_id"] for item in phase8_results["holdout_gold_changes"]
