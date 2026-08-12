@@ -15,7 +15,9 @@ venv/
 # Environment variables and secrets
 .env
 .env.local
+.env.staging
 !.env.example
+!.env.staging.example
 
 # IDE
 .vscode/
