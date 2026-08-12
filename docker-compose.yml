@@ -36,7 +36,7 @@ services:
       OLLAMA_HOST: http://host.docker.internal:11434
 
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
 
     volumes:
       - type: bind
@@ -84,7 +84,7 @@ services:
       dockerfile: Dockerfile
     image: phosprocess-frontend:0.3.0
     ports:
-      - "5173:80"
+      - "${FRONTEND_HOST_PORT:-5173}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -100,7 +100,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.13.2
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -115,7 +115,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
     ports:
-      - "3000:3000"
+      - "${GRAFANA_HOST_PORT:-3000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -129,7 +129,7 @@ services:
     environment:
       NVIDIA_DRIVER_CAPABILITIES: utility
     ports:
-      - "9835:9835"
+      - "${GPU_EXPORTER_HOST_PORT:-9835}:9835"
     restart: unless-stopped
 
 volumes:
